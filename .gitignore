@@ -1,0 +1,8 @@
+x64/
+x86/
+.vs/
+run_trees/
+output/
+intermediate/
+
+imgui.ini
