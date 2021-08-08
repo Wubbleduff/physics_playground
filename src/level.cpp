@@ -240,10 +240,11 @@ void Level::reset()
         }
     }
 
+
     //srand((unsigned)time(NULL));
-    srand(0);
+    srand(1);
 #if 1
-    for(int i = 0; i < 1; i++)
+    for(int i = 0; i < 5; i++)
     {
         Body *body = make_body();
         body->transform.position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
@@ -256,8 +257,14 @@ void Level::reset()
     }
 #endif
 
-#if 0
-    for(int i = 0; i < 3; i++)
+    Body *mouse_body = make_body();
+    Circle *mouse_shape = new Circle();
+    mouse_shape->radius = 0.1f;
+    mouse_body->shape = mouse_shape;
+    mouse_body_index = bodies.size() - 1;
+
+#if 1
+    for(int i = 0; i < 5; i++)
     {
         Body *body = make_body();
         body->transform.position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
@@ -302,6 +309,12 @@ void Level::step(float time_step)
             {
                 if(body->is_static) continue;
 
+                static const float SMALLEST_SPEED = 0.001f;
+                if(length(body->velocity) < SMALLEST_SPEED)
+                {
+                    body->velocity = v2();
+                }
+
                 body->velocity.y += -9.81f * divided_time_step;
                 body->velocity -= body->velocity * 1.0f * divided_time_step;
                 body->transform.position += body->velocity * divided_time_step;
@@ -315,6 +328,8 @@ void Level::step(float time_step)
                 {
                     Body *a = bodies[i];
                     Body *b = bodies[j];
+
+                    if(!a->shape || !b->shape) continue;
 
                     bool hit = false;
                     Collision collision = {};
@@ -332,6 +347,26 @@ void Level::step(float time_step)
                 }
             }
 
+            {
+                Body *mouse_body = bodies[mouse_body_index]; 
+                v2 mouse_velocity = (mouse_pos - mouse_body->transform.position) * 1.0f / time_step;
+                mouse_body->velocity = mouse_velocity;
+
+                /*
+                Body *body = bodies[bodies.size() - 2];
+                v2 mouse_diff = body->transform.position - mouse_body->transform.position;
+                if(length(mouse_diff) >= 3.0f)
+                {
+                    Collision col;
+                    col.manifold.a_in_b = body->transform.position;
+                    col.manifold.b_in_a = mouse_pos + normalize(mouse_diff) * 3.0f;
+                    col.a = mouse_body;
+                    col.b = body;
+                    collisions.push_back(col);
+                }
+                */
+            }
+
             // Collision resolution
             // Impulse
             for(const Collision &collision : collisions)
@@ -339,8 +374,13 @@ void Level::step(float time_step)
                 float a_inv_mass = collision.a->is_static ? 0.0f : 1.0f / collision.a->mass;
                 float b_inv_mass = collision.b->is_static ? 0.0f : 1.0f / collision.b->mass;
                 v2 relative_velocity = collision.b->velocity - collision.a->velocity;
-                v2 normal = normalize(collision.manifold.b_in_a - collision.manifold.a_in_b);
+                v2 normal = normalize(collision.manifold.a_in_b - collision.manifold.b_in_a);
                 float n_speed = dot(relative_velocity, normal);
+
+                if(n_speed < 0.0f)
+                {
+                    continue;
+                }
 
                 float e = 1.0f * 0.5f;
                 // float e = collision.a->restitution * collision.b->restitution;
@@ -366,10 +406,10 @@ void Level::step(float time_step)
 
                 float f_vel = dot(relative_velocity, tangent);
 
-                float a_sf = 0.3f;
-                float b_sf = 0.3f;
-                float a_df = 0.2f;
-                float b_df = 0.2f;
+                float a_sf = 0.1f;
+                float b_sf = 0.1f;
+                float a_df = 0.1f;
+                float b_df = 0.1f;
                 float mu  = length(v2(a_sf, b_sf));
 
                 float f  = -f_vel / (a_inv_mass + b_inv_mass);
@@ -427,7 +467,7 @@ void Level::step(float time_step)
                 }
 
                 v2 diff = collision.manifold.b_in_a - collision.manifold.a_in_b;
-                v2 normal = normalize(diff);
+                v2 normal = -normalize(diff);
                 float pen_depth = length(diff);
                 pen_depth = max(pen_depth - slop, 0.0f);
                 v2 correction = normal * pen_depth * percent;

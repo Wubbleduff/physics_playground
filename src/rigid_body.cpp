@@ -87,8 +87,8 @@ static bool circle_box(v2 c_center, float c_radius, v2 b_center, v2 b_half_exten
             else if(min_diff == top_diff) normal = v2(0.0f, 1.0f);
             else if(min_diff == bottom_diff) normal = v2(0.0f, -1.0f);
 
-            m->a_in_b = c_center - normal * c_radius;
-            m->b_in_a = c_center + normal * (min_diff - c_radius);
+            m->b_in_a = c_center - normal * c_radius;
+            m->a_in_b = c_center + normal * (min_diff - c_radius);
 
             return true;
         }
@@ -97,8 +97,8 @@ static bool circle_box(v2 c_center, float c_radius, v2 b_center, v2 b_half_exten
             // Center outside of box
             v2 diff = c_center - clamped;
             v2 normal = normalize(diff);
-            m->a_in_b = c_center - normal * c_radius;
-            m->b_in_a = clamped;
+            m->b_in_a = c_center - normal * c_radius;
+            m->a_in_b = clamped;
             return true;
         }
     }
@@ -120,8 +120,8 @@ static bool circle_plane(v2 a_center, float a_radius, v2 b_pos, v2 b_normal, Col
     }
     else
     {
-        m->b_in_a = a_center - b_normal * a_radius;
-        m->a_in_b = project_onto_plane(a_center, b_pos, b_normal);
+        m->a_in_b = a_center - b_normal * a_radius;
+        m->b_in_a = project_onto_plane(a_center, b_pos, b_normal);
         return true;
     }
 }
@@ -323,8 +323,8 @@ static bool box_plane(v2 a_center, v2 a_half_extents,
         return false;
     }
 
-    m->b_in_a = a_vertices[most_negative_i];
-    m->a_in_b = project_onto_plane(a_vertices[most_negative_i], b_pos, b_normal);
+    m->a_in_b = a_vertices[most_negative_i];
+    m->b_in_a = project_onto_plane(a_vertices[most_negative_i], b_pos, b_normal);
     return true;
 }
 
@@ -413,6 +413,9 @@ void Plane::draw(Transform *transform)
 
 void Body::draw()
 {
-    shape->draw(&transform);
+    if(shape)
+    {
+        shape->draw(&transform);
+    }
 }
 

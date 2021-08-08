@@ -12,6 +12,7 @@ struct Body;
 struct Level
 {
     std::vector<Body *> bodies;
+    int mouse_body_index;
 
     void init();
     void uninit();

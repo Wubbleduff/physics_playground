@@ -28,7 +28,7 @@ struct Shape
 
 struct Circle : public Shape
 {
-    float radius;
+    float radius = 1.0f;
 
     bool collide(GameMath::Transform *transform, struct Shape *other, GameMath::Transform *other_transform, Collision::Manifold *manifold) override;
     bool collide(GameMath::Transform *transform, struct Circle *other, GameMath::Transform *other_transform, Collision::Manifold *manifold) override;
@@ -40,7 +40,7 @@ struct Circle : public Shape
 
 struct Box : public Shape
 {
-    GameMath::v2 half_extents;
+    GameMath::v2 half_extents = GameMath::v2(1.0f, 1.0f);
 
     bool collide(GameMath::Transform *transform, struct Shape *other, GameMath::Transform *other_transform, Collision::Manifold *manifold) override;
     bool collide(GameMath::Transform *transform, struct Circle *other, GameMath::Transform *other_transform, Collision::Manifold *manifold) override;
@@ -52,7 +52,7 @@ struct Box : public Shape
 
 struct Plane : public Shape
 {
-    GameMath::v2 normal;
+    GameMath::v2 normal = GameMath::v2(0.0f, 1.0f);
 
     bool collide(GameMath::Transform *transform, struct Shape *other, GameMath::Transform *other_transform, Collision::Manifold *manifold) override;
     bool collide(GameMath::Transform *transform, struct Circle *other, GameMath::Transform *other_transform, Collision::Manifold *manifold) override;
