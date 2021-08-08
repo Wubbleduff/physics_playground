@@ -1,0 +1,492 @@
+
+#include "level.h"
+#include "graphics.h"
+#include "rigid_body.h"
+
+#include <cstdio>
+#include <cassert>
+#include <cstdlib> // rand
+#include <ctime> // rand
+
+using namespace GameMath;
+
+
+
+
+template<typename T>
+static void swap(T &a, T &b)
+{
+    T temp = a;
+    a = b;
+    b = a;
+}
+
+
+#if 0
+static void draw_debug_scenarios()
+{
+    v2 mouse_pos = Graphics::mouse_world_position();
+
+    if(false)
+    {
+        v2 a = v2();
+        float ar = 1.0f;
+        v4 ac = v4(0.4f, 0.4f, 0.4f, 1.0f);
+        v2 b = mouse_pos;
+        float br = 1.0f;
+        v4 bc = v4(0.4f, 0.4f, 0.4f, 1.0f);
+
+        Collision col;
+        bool hit;
+
+        hit = circle_circle(a, ar, b, br, &col.manifold);
+        if(hit)
+        {
+            ac = v4(0.4f, 0.5f, 0.0f, 1.0f);
+            bc = v4(0.4f, 0.5f, 0.0f, 1.0f);
+
+            v4 geo_color = v4(0.1f, 0.8f, 0.0f, 1.0f);
+            Graphics::circle(col.manifold.a_in_b, 0.05f, geo_color, 1);
+            Graphics::circle(col.manifold.b_in_a, 0.05f, geo_color, 1);
+            /*
+               Graphics::line(col.manifold.a_in_b,
+               col.manifold.a_in_b + col.manifold.normal * col.manifold.pen_depth,
+               0.1f, geo_color);
+               */
+        }
+        Graphics::circle(a, ar, ac);
+        Graphics::circle(b, br, bc);
+    }
+
+    if(false) {
+        v2 a = v2();
+        float ar = 1.0f;
+        v4 ac = v4(0.4f, 0.4f, 0.4f, 1.0f);
+        v2 b = mouse_pos;
+        v2 br = v2(2.0f, 2.0f);
+        v4 bc = v4(0.4f, 0.4f, 0.4f, 1.0f);
+
+        Collision col;
+        bool hit;
+
+        hit = circle_box(a, ar, b, br, &col.manifold);
+        if(hit)
+        {
+            ac = v4(0.4f, 0.5f, 0.0f, 1.0f);
+            bc = v4(0.4f, 0.5f, 0.0f, 1.0f);
+
+            v4 geo_color = v4(0.1f, 0.8f, 0.0f, 1.0f);
+            Graphics::circle(col.manifold.a_in_b, 0.05f, geo_color, 1);
+            Graphics::circle(col.manifold.b_in_a, 0.05f, geo_color, 1);
+            /*
+               Graphics::line(col.manifold.a_in_b,
+               col.manifold.a_in_b + col.manifold.normal * col.manifold.pen_depth,
+               0.1f, geo_color);
+               */
+        }
+        Graphics::circle(a, ar, ac);
+        Graphics::quad(b, br, 0.0f, bc);
+
+    }
+
+    if(false)
+    {
+        v2 a = v2();
+        v2 ar = v2(1.0f, 1.0f);
+        v4 ac = v4(0.4f, 0.4f, 0.4f, 1.0f);
+        v2 b = mouse_pos;
+        v2 br = v2(2.0f, 2.0f);
+        v4 bc = v4(0.4f, 0.4f, 0.4f, 1.0f);
+
+        Collision col;
+        bool hit;
+
+        hit = box_box(a, v2(ar.x, 0.0f), v2(0.0f, ar.y), b, v2(br.x, 0.0f), v2(0.0f, br.y), &col.manifold);
+        if(hit)
+        {
+            ac = v4(0.4f, 0.5f, 0.0f, 1.0f);
+            bc = v4(0.4f, 0.5f, 0.0f, 1.0f);
+
+            v4 geo_color = v4(0.1f, 0.8f, 0.0f, 1.0f);
+            Graphics::circle(col.manifold.a_in_b, 0.05f, geo_color, 1);
+            Graphics::circle(col.manifold.b_in_a, 0.05f, geo_color, 1);
+            /*
+               Graphics::line(col.manifold.a_in_b,
+               col.manifold.a_in_b + col.manifold.normal * col.manifold.pen_depth,
+               0.1f, geo_color);
+               */
+        }
+        Graphics::quad(a, ar, 0.0f, ac);
+        Graphics::quad(b, br, 0.0f, bc);
+
+    }
+
+    if(true)
+    {
+        v2 a = mouse_pos;
+        v2 ar = v2(1.0f, 1.0f);
+        v4 ac = v4(0.4f, 0.4f, 0.4f, 1.0f);
+        v2 b = v2();
+        static v2 br = v2(0.0f, 1.0f);
+        v4 bc = v4(0.4f, 0.4f, 0.4f, 1.0f);
+
+        br = rotate_vector(br, 0.01f);
+
+        Collision col;
+        bool hit;
+
+        hit = box_plane(a, v2(ar.x, 0.0f), v2(0.0f, ar.y), b, br, &col.manifold);
+        if(hit)
+        {
+            ac = v4(0.4f, 0.5f, 0.0f, 1.0f);
+            bc = v4(0.4f, 0.5f, 0.0f, 1.0f);
+
+            v4 geo_color = v4(0.1f, 0.8f, 0.0f, 1.0f);
+            Graphics::circle(col.manifold.a_in_b, 0.05f, geo_color, 1);
+            Graphics::circle(col.manifold.b_in_a, 0.05f, geo_color, 1);
+            /*
+               Graphics::line(col.manifold.a_in_b,
+               col.manifold.a_in_b + col.manifold.normal * col.manifold.pen_depth,
+               0.1f, geo_color);
+               */
+        }
+
+        v2 position = b;
+        v2 normal = br;
+        const float PLANE_SCALE = 1000.0f;
+        float plane_rotation = angle_between(normal, v2(0.0f, 1.0f));
+        if(dot(normal, v2(1.0f, 0.0f)) > 0.0f) plane_rotation *= -1.0f;
+        Graphics::quad(position - normal * PLANE_SCALE / 2.0f,
+                v2(0.5f, 0.5f) * PLANE_SCALE,
+                plane_rotation,
+                v4(0.4f, 0.4f, 0.0f, 1.0f));
+        Graphics::quad(a, ar, 0.0f, ac);
+
+    }
+}
+#endif
+
+
+
+
+
+
+Body *Level::make_body()
+{
+    Body *body = new Body;
+
+    body->is_static = false;
+
+    body->transform.position = v2();
+    body->velocity = v2();
+    body->mass = 1.0f;
+
+    body->shape = nullptr;
+
+    bodies.push_back(body);
+
+    return body;
+}
+
+void Level::destroy_body(Body *body)
+{
+    delete body;
+}
+
+void Level::init()
+{
+    reset();
+}
+
+void Level::uninit()
+{
+}
+
+void Level::reset()
+{
+    for(Body *b : bodies) delete b;
+    bodies.clear();
+
+    for(int i = 0; i < 4; i++)
+    {
+        Body *body = make_body();
+
+        body->is_static = true;
+        body->velocity = v2();
+        body->mass = 0.0f;
+
+        Plane *plane = new Plane();
+        body->shape = plane;
+
+        float pad = 0.1f;
+        switch(i)
+        {
+            case 0:
+                body->transform.position = v2(0.0f, -Graphics::Camera::height() / 2.0f + pad);
+                plane->normal = v2(0.0f, 1.0f);
+                break;
+            case 1:
+                body->transform.position = v2(Graphics::Camera::width() / 2.0f - pad, 0.0f);
+                plane->normal = v2(-1.0f, 0.0f);
+                break;
+            case 2:
+                body->transform.position = v2(0.0f,  Graphics::Camera::height() / 2.0f - pad);
+                plane->normal = v2(0.0f, -1.0f);
+                break;
+            case 3:
+                body->transform.position = v2(-Graphics::Camera::width() / 2.0f + pad, 0.0f);
+                plane->normal = v2(1.0f, 0.0f);
+                break;
+        }
+    }
+
+    //srand((unsigned)time(NULL));
+    srand(0);
+#if 1
+    for(int i = 0; i < 1; i++)
+    {
+        Body *body = make_body();
+        body->transform.position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
+        body->velocity = v2(random_range(-5.0f, 5.0f), random_range(-5.0f, 5.0f));
+        body->mass = 1.0f;
+
+        Circle *circle = new Circle();
+        body->shape = circle;
+        circle->radius = 0.5f;
+    }
+#endif
+
+#if 0
+    for(int i = 0; i < 3; i++)
+    {
+        Body *body = make_body();
+        body->transform.position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
+        body->velocity = v2(random_range(-5.0f, 5.0f), random_range(-5.0f, 5.0f));
+        body->mass = 1.0f;
+
+        Box *box = new Box();
+        body->shape = box;
+        box->half_extents = v2(0.5f, 0.5f);
+    }
+#endif
+
+}
+
+void Level::step(float time_step)
+{
+    static v2 last_mouse_pos = v2();
+    v2 mouse_pos = Graphics::mouse_world_position();
+
+    /*
+    if(Input::key_down('R'))
+    {
+        reset();
+        return;
+    }
+    */
+
+    //bodies.back()->position = mouse_pos;
+
+
+#if 1
+    static Collision d_col;
+    //if((last_mouse_pos.x < 0.0f && mouse_pos.x > 0.0f) || mouse_pos.y > 5.0f)
+    {
+        int iters = 8;
+        for(int i = 0 ; i < iters; i++)
+        {
+            float divided_time_step = time_step / iters;
+
+            // Kinematics
+            for(Body *&body : bodies)
+            {
+                if(body->is_static) continue;
+
+                body->velocity.y += -9.81f * divided_time_step;
+                body->velocity -= body->velocity * 1.0f * divided_time_step;
+                body->transform.position += body->velocity * divided_time_step;
+            }
+
+            // Collision detection
+            std::vector<Collision> collisions;
+            for(int i = 0; i < bodies.size(); i++)
+            {
+                for(int j = i + 1; j < bodies.size(); j++)
+                {
+                    Body *a = bodies[i];
+                    Body *b = bodies[j];
+
+                    bool hit = false;
+                    Collision collision = {};
+
+                    hit = a->shape->collide(&a->transform, b->shape, &b->transform, &collision.manifold);
+
+                    if(hit)
+                    {
+                        collision.a = a;
+                        collision.b = b;
+                        collisions.push_back(collision);
+
+                        d_col = collision;
+                    }
+                }
+            }
+
+            // Collision resolution
+            // Impulse
+            for(const Collision &collision : collisions)
+            {
+                float a_inv_mass = collision.a->is_static ? 0.0f : 1.0f / collision.a->mass;
+                float b_inv_mass = collision.b->is_static ? 0.0f : 1.0f / collision.b->mass;
+                v2 relative_velocity = collision.b->velocity - collision.a->velocity;
+                v2 normal = normalize(collision.manifold.b_in_a - collision.manifold.a_in_b);
+                float n_speed = dot(relative_velocity, normal);
+
+                float e = 1.0f * 0.5f;
+                // float e = collision.a->restitution * collision.b->restitution;
+                float j = -(1.0f + e) * n_speed / (a_inv_mass + b_inv_mass);
+                v2 impulse = j * normal;
+
+                if(!collision.a->is_static)
+                {
+                    collision.a->velocity -= impulse * a_inv_mass;
+                }
+
+                if(!collision.b->is_static)
+                {
+                    collision.b->velocity += impulse * b_inv_mass;
+                }
+
+                // Friction
+#if 0
+                relative_velocity = collision.a->velocity - collision.b->velocity;
+
+                v2 tangent = relative_velocity - dot(relative_velocity, normal) * normal;
+                tangent = normalize(tangent);
+
+                float f_vel = dot(relative_velocity, tangent);
+
+                float a_sf = 0.3f;
+                float b_sf = 0.3f;
+                float a_df = 0.2f;
+                float b_df = 0.2f;
+                float mu  = length(v2(a_sf, b_sf));
+
+                float f  = -f_vel / (a_inv_mass + b_inv_mass);
+
+                v2 friction;
+                if(abs(f) < j * mu)
+                {
+                    friction = f * tangent;
+                }
+                else
+                {
+                    mu = length(v2(a_df, b_df));
+                    friction = -j * tangent * mu;
+                }
+
+                if(!collision.a->is_static)
+                {
+                    collision.a->velocity = collision.a->velocity - friction * a_inv_mass;
+                }
+                if(!collision.b->is_static)
+                {
+                    collision.b->velocity = collision.b->velocity + friction * b_inv_mass;
+                }
+#endif
+            }
+
+            // Position correction
+#if 1
+            for(const Collision &collision : collisions)
+            {
+                float percent = 0.8f;
+                float slop = 0.01f;
+
+                float a_factor;
+                float b_factor;
+                if(collision.a->is_static && collision.b->is_static)
+                {
+                    continue;
+                }
+                else if(collision.a->is_static && !collision.b->is_static)
+                {
+                    a_factor = 0.0f;
+                    b_factor = 1.0f;
+                }
+                else if(collision.b->is_static && !collision.a->is_static)
+                {
+                    a_factor = 1.0f;
+                    b_factor = 0.0f;
+                }
+                else
+                {
+                    float sum = collision.a->mass + collision.b->mass;
+                    a_factor = collision.a->mass / sum;
+                    b_factor = collision.b->mass / sum;
+                }
+
+                v2 diff = collision.manifold.b_in_a - collision.manifold.a_in_b;
+                v2 normal = normalize(diff);
+                float pen_depth = length(diff);
+                pen_depth = max(pen_depth - slop, 0.0f);
+                v2 correction = normal * pen_depth * percent;
+                collision.a->transform.position += correction * a_factor;
+                collision.b->transform.position -= correction * b_factor;
+            }
+#endif
+        }
+    }
+#endif
+
+#if 0
+    Graphics::circle(d_col.manifold.a_in_b, 0.1, v4(1.0f, 0.0f, 0.0f, 1.0f), 1);
+    Graphics::circle(d_col.manifold.b_in_a, 0.1, v4(0.0f, 1.0f, 0.0f, 1.0f), 1);
+
+#endif
+
+    last_mouse_pos = mouse_pos;
+}
+
+void Level::draw()
+{
+    for(Body *body : bodies)
+    {
+        body->draw();
+    }
+#if 0
+    for(const Body *body : bodies)
+    {
+        if(body->shape == Body::CIRCLE)
+        {
+            Graphics::circle(body->transform.position, body->circle.radius, v4(0.5f, 0.0f, 1.0f, 1.0f));
+        }
+        else if(body->shape == Body::BOX)
+        {
+            Graphics::quad(body->transform.position, body->box.up + body->box.right, 0.0f, v4(0.5f, 0.0f, 1.0f, 1.0f));
+        }
+        else if(body->shape == Body::PLANE)
+        {
+            v2 transform.position = body->transform.position;
+            v2 normal = body->plane.normal;
+            const float PLANE_SCALE = 1000.0f;
+            float plane_rotation = angle_between(normal, v2(0.0f, 1.0f));
+            if(dot(normal, v2(1.0f, 0.0f)) > 0.0f) plane_rotation *= -1.0f;
+            Graphics::quad(transform.position - normal * PLANE_SCALE / 2.0f,
+                    v2(0.5f, 0.5f) * PLANE_SCALE,
+                    plane_rotation,
+                    v4(0.4f, 0.4f, 0.0f, 1.0f));
+        }
+    }
+
+    //for(Circle &circle : circles) circle.draw();
+
+    v2 mouse_pos = Graphics::mouse_world_position();
+    Graphics::circle(mouse_pos, 0.1f, v4(0.5f, 0.0f, 1.0f, 0.3f));
+#endif
+
+#if 0
+    draw_debug_scenarios();
+#endif
+};
+
