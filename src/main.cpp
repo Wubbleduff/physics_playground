@@ -8,9 +8,11 @@
 
 #include "level.h"
 
+#include <windows.h>
+
 using namespace GameMath;
 
-int main()
+INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nCmdShow)
 {
     bool success = Graphics::init();
     if(!success)

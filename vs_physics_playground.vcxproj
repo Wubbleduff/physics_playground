@@ -20,7 +20,7 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
-    <ProjectGuid>{0F306B92-32A1-48D0-91BD-2120721200F7}</ProjectGuid>
+    <ProjectGuid>{53215173-323B-468D-8506-D99AA2783A58}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -38,7 +38,6 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
-    <VCToolsVersion />
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -65,16 +64,9 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>src;lib\glew-2.1.0\include;lib\imgui;lib\stb;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>true</LinkIncremental>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>src;lib\imgui;lib\glew-2.1.0\include;lib\stb;$(IncludePath)</IncludePath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>lib\glew-2.1.0\include;lib\imgui;lib\stb;src;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -88,7 +80,6 @@
       <TargetMachine>MachineX86</TargetMachine>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>opengl32.lib;lib\glew-2.1.0\lib\Release\x64\glew32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -107,42 +98,40 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>src;lib\glad\include;lib\glfw-3.3.4.bin.WIN64\include;lib\imgui;lib\stb</AdditionalIncludeDirectories>
+    </ClCompile>
     <Link>
-      <AdditionalDependencies>opengl32.lib;lib\glew-2.1.0\lib\Release\x64\glew32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-    </Link>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <Link>
-      <AdditionalDependencies>opengl32.lib;lib\glew-2.1.0\lib\Release\x64\glew32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opengl32.lib;lib\glfw-3.3.4.bin.WIN64\lib-vc2019\glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="lib\glad\src\glad.c" />
     <ClCompile Include="lib\imgui\examples\imgui_impl_opengl3.cpp" />
     <ClCompile Include="lib\imgui\examples\imgui_impl_win32.cpp" />
     <ClCompile Include="lib\imgui\imgui.cpp" />
     <ClCompile Include="lib\imgui\imgui_demo.cpp" />
     <ClCompile Include="lib\imgui\imgui_draw.cpp" />
     <ClCompile Include="lib\imgui\imgui_widgets.cpp" />
-    <ClCompile Include="src\engine.cpp" />
-    <ClCompile Include="src\input.cpp" />
+    <ClCompile Include="src\game_math.cpp" />
+    <ClCompile Include="src\graphics.cpp" />
     <ClCompile Include="src\level.cpp" />
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\memory.cpp" />
-    <ClCompile Include="src\my_algorithms.cpp" />
-    <ClCompile Include="src\renderer.cpp" />
-    <ClCompile Include="src\shader.cpp" />
+    <ClCompile Include="src\rigid_body.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\engine.h" />
-    <ClInclude Include="src\input.h" />
+    <ClInclude Include="lib\imgui\examples\imgui_impl_opengl3.h" />
+    <ClInclude Include="lib\imgui\examples\imgui_impl_win32.h" />
+    <ClInclude Include="lib\imgui\imconfig.h" />
+    <ClInclude Include="lib\imgui\imgui.h" />
+    <ClInclude Include="lib\imgui\imgui_internal.h" />
+    <ClInclude Include="lib\imgui\imstb_rectpack.h" />
+    <ClInclude Include="lib\imgui\imstb_textedit.h" />
+    <ClInclude Include="lib\imgui\imstb_truetype.h" />
+    <ClInclude Include="src\game_math.h" />
+    <ClInclude Include="src\graphics.h" />
     <ClInclude Include="src\level.h" />
-    <ClInclude Include="src\memory.h" />
-    <ClInclude Include="src\my_algorithms.h" />
-    <ClInclude Include="src\my_math.h" />
-    <ClInclude Include="src\platform.h" />
-    <ClInclude Include="src\quad_tree.h" />
-    <ClInclude Include="src\renderer.h" />
-    <ClInclude Include="src\shader.h" />
+    <ClInclude Include="src\rigid_body.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
