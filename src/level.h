@@ -1,9 +1,26 @@
 
 #pragma once
 
-struct Level;
+#include "game_math.h"
 
-Level *create_level();
+#include <vector>
 
-void level_step(Level *level, float dt);
+
+
+struct Body;
+
+struct Level
+{
+    std::vector<Body *> bodies;
+    int mouse_body_index;
+
+    void init();
+    void uninit();
+    void reset();
+    void step(float time_step);
+    void draw();
+
+    Body *make_body();
+    void destroy_body(Body *body);
+};
 

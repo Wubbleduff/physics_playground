@@ -1,99 +1,18 @@
 
-INTERMEDIATE=intermediate
+libs = -lX11 lib/glfw/lib/libglfw3.a -lrt -lm -ldl
+include_dirs = -I lib/glad/include -I lib/glfw/include 
+source = lib/glad/src/glad.c \
+	 src/main.cpp \
+	 src/graphics.cpp \
+	 src/game_math.cpp \
+	 src/level.cpp \
+	 src/rigid_body.cpp
+executable = physics_playground
 
-DEBUG_RUN_TREE=run_trees\debug
-OPTIMIZED_DEBUG_RUN_TREE=run_trees\optimized_debug
-RELEASE_RUN_TREE=run_trees\release
+build_and_run:
+	g++ `pkg-config --cflags glfw3` $(include_dirs) $(source) `pkg-config --static --libs glfw3` -g -o $(executable)
+	./$(executable)
 
-EXE=engine.exe
-
-PDB=engine.pdb
-
-SOURCE=\
-src\main.cpp \
-src\engine.cpp \
-src\memory.cpp \
-src\my_algorithms.cpp \
-src\input.cpp \
-src\renderer.cpp \
-src\shader.cpp \
-src\level.cpp \
-lib\imgui\imgui.cpp \
-lib\imgui\imgui_demo.cpp \
-lib\imgui\imgui_draw.cpp \
-lib\imgui\imgui_widgets.cpp \
-lib\imgui\examples\imgui_impl_opengl3.cpp \
-lib\imgui\examples\imgui_impl_win32.cpp
-
-INCLUDE_DIRS=/I"src" /I"lib\glew-2.1.0\include" /I"lib\imgui" /I"lib\stb"
-
-LIBS=user32.lib gdi32.lib shell32.lib opengl32.lib lib\glew-2.1.0\lib\Release\x64\glew32.lib
-
-# DLLs
-DLL_GLEW=lib\glew-2.1.0\bin\Release\x64\glew32.dll
-
-DEBUG_MACROS=
-OPTIMIZED_DEBUG_MACROS=
-RELEASE_MACROS=
-
-DEBUG_COMPILE_FLAGS=/c /Z7 /EHsc /Fo$(INTERMEDIATE)\ $(DEBUG_MACROS)
-DEBUG_LINK_FLAGS=/DEBUG:FULL /OUT:"$(INTERMEDIATE)\$(EXE)"
-
-OPTIMIZED_DEBUG_COMPILE_FLAGS=/c /Z7 /EHsc /Fo$(INTERMEDIATE)\ $(DEBUG_MACROS)
-OPTIMIZED_DEBUG_LINK_FLAGS=/DEBUG:FULL /OUT:"$(INTERMEDIATE)\$(EXE)"
-
-RELEASE_COMPILE_FLAGS=/c /O2 /EHsc /Fo$(INTERMEDIATE)\ $(RELEASE_MACROS)
-RELEASE_LINK_FLAGS=/DEBUG:NONE /OUT:"$(INTERMEDIATE)\$(EXE)"
-
-debug: | intermediate $(DEBUG_RUN_TREE)
-	cl $(DEBUG_COMPILE_FLAGS) $(INCLUDE_DIRS) $(SOURCE)
-	link $(DEBUG_LINK_FLAGS) $(LIBS) $(INTERMEDIATE)\*.obj
-	xcopy /Y $(INTERMEDIATE)\$(EXE) $(DEBUG_RUN_TREE)
-	xcopy /Y $(INTERMEDIATE)\$(PDB) $(DEBUG_RUN_TREE)
-	xcopy /Y $(DLL_GLEW) $(DEBUG_RUN_TREE)
-	xcopy /Y /I ".\textures\" "$(DEBUG_RUN_TREE)\target_textures"
-	xcopy /Y /I ".\shaders\" "$(DEBUG_RUN_TREE)\shaders"
-	xcopy /Y /I ".\fonts\" "$(DEBUG_RUN_TREE)\fonts"
-
-optimized_debug: | intermediate $(OPTIMIZED_DEBUG_RUN_TREE)
-	cl $(OPTIMIZED_DEBUG_COMPILE_FLAGS) $(INCLUDE_DIRS) $(SOURCE)
-	link $(OPTIMIZED_DEBUG_LINK_FLAGS) $(LIBS) $(INTERMEDIATE)\*.obj
-	xcopy /Y $(INTERMEDIATE)\$(EXE) $(OPTIMIZED_DEBUG_RUN_TREE)
-	xcopy /Y $(INTERMEDIATE)\$(PDB) $(OPTIMIZED_DEBUG_RUN_TREE)
-	xcopy /Y $(DLL_GLEW) $(OPTIMIZED_DEBUG_RUN_TREE)
-	xcopy /Y /I ".\textures\" "$(OPTIMIZED_DEBUG_RUN_TREE)\target_textures"
-	xcopy /Y /I ".\shaders\" "$(OPTIMIZED_DEBUG_RUN_TREE)\shaders"
-	xcopy /Y /I ".\fonts\" "$(OPTIMIZED_DEBUG_RUN_TREE)\fonts"
-
-release: | intermediate $(RELEASE_RUN_TREE)
-	cl $(RELEASE_COMPILE_FLAGS) $(INCLUDE_DIRS) $(SOURCE)
-	link $(RELEASE_LINK_FLAGS) $(LIBS) $(INTERMEDIATE)\*.obj
-	xcopy /Y $(INTERMEDIATE)\$(EXE) $(RELEASE_RUN_TREE)
-	xcopy /Y $(DLL_GLEW) $(RELEASE_RUN_TREE)
-	xcopy /Y /I ".\textures\" "$(RELEASE_RUN_TREE)\target_textures"
-	xcopy /Y /I ".\shaders\" "$(RELEASE_RUN_TREE)\shaders"
-	xcopy /Y /I ".\fonts\" "$(RELEASE_RUN_TREE)\fonts"
-
-clean: | intermediate
-	del $(INTERMEDIATE)\*.obj
-	del $(INTERMEDIATE)\*.exe
-	del $(INTERMEDIATE)\*.pdb
-	del $(INTERMEDIATE)\*.ilk
-
-
-# Building directory rules
-intermediate:
-	mkdir $(INTERMEDIATE)
-
-$(DEBUG_RUN_TREE): | run_trees
-	mkdir $(DEBUG_RUN_TREE)
-
-$(OPTIMIZED_DEBUG_RUN_TREE): | run_trees
-	mkdir $(OPTIMIZED_DEBUG_RUN_TREE)
-
-$(RELEASE_RUN_TREE): | run_trees
-	mkdir $(RELEASE_RUN_TREE)
-
-run_trees :
-	mkdir run_trees
+build:
+	g++ `pkg-config --cflags glfw3` $(include_dirs) $(source) `pkg-config --static --libs glfw3` -g -o $(executable)
 
