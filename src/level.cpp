@@ -22,147 +22,26 @@ static void swap(T &a, T &b)
 }
 
 
-#if 0
+
+#if 1
 static void draw_debug_scenarios()
 {
     v2 mouse_pos = Graphics::mouse_world_position();
 
-    if(false)
-    {
-        v2 a = v2();
-        float ar = 1.0f;
-        v4 ac = v4(0.4f, 0.4f, 0.4f, 1.0f);
-        v2 b = mouse_pos;
-        float br = 1.0f;
-        v4 bc = v4(0.4f, 0.4f, 0.4f, 1.0f);
 
-        Collision col;
-        bool hit;
+    Body a;
+    Box *box = new Box();
+    a.shape = box;
 
-        hit = circle_circle(a, ar, b, br, &col.manifold);
-        if(hit)
-        {
-            ac = v4(0.4f, 0.5f, 0.0f, 1.0f);
-            bc = v4(0.4f, 0.5f, 0.0f, 1.0f);
+    Body b;
+    Circle *circle = new Circle;
+    b.shape = circle;
 
-            v4 geo_color = v4(0.1f, 0.8f, 0.0f, 1.0f);
-            Graphics::circle(col.manifold.a_in_b, 0.05f, geo_color, 1);
-            Graphics::circle(col.manifold.b_in_a, 0.05f, geo_color, 1);
-            /*
-               Graphics::line(col.manifold.a_in_b,
-               col.manifold.a_in_b + col.manifold.normal * col.manifold.pen_depth,
-               0.1f, geo_color);
-               */
-        }
-        Graphics::circle(a, ar, ac);
-        Graphics::circle(b, br, bc);
-    }
+    //Graphics::quad(a.transform.position, box->half_extents, 0.0f, Color::YELLOW);
 
-    if(false) {
-        v2 a = v2();
-        float ar = 1.0f;
-        v4 ac = v4(0.4f, 0.4f, 0.4f, 1.0f);
-        v2 b = mouse_pos;
-        v2 br = v2(2.0f, 2.0f);
-        v4 bc = v4(0.4f, 0.4f, 0.4f, 1.0f);
-
-        Collision col;
-        bool hit;
-
-        hit = circle_box(a, ar, b, br, &col.manifold);
-        if(hit)
-        {
-            ac = v4(0.4f, 0.5f, 0.0f, 1.0f);
-            bc = v4(0.4f, 0.5f, 0.0f, 1.0f);
-
-            v4 geo_color = v4(0.1f, 0.8f, 0.0f, 1.0f);
-            Graphics::circle(col.manifold.a_in_b, 0.05f, geo_color, 1);
-            Graphics::circle(col.manifold.b_in_a, 0.05f, geo_color, 1);
-            /*
-               Graphics::line(col.manifold.a_in_b,
-               col.manifold.a_in_b + col.manifold.normal * col.manifold.pen_depth,
-               0.1f, geo_color);
-               */
-        }
-        Graphics::circle(a, ar, ac);
-        Graphics::quad(b, br, 0.0f, bc);
-
-    }
-
-    if(false)
-    {
-        v2 a = v2();
-        v2 ar = v2(1.0f, 1.0f);
-        v4 ac = v4(0.4f, 0.4f, 0.4f, 1.0f);
-        v2 b = mouse_pos;
-        v2 br = v2(2.0f, 2.0f);
-        v4 bc = v4(0.4f, 0.4f, 0.4f, 1.0f);
-
-        Collision col;
-        bool hit;
-
-        hit = box_box(a, v2(ar.x, 0.0f), v2(0.0f, ar.y), b, v2(br.x, 0.0f), v2(0.0f, br.y), &col.manifold);
-        if(hit)
-        {
-            ac = v4(0.4f, 0.5f, 0.0f, 1.0f);
-            bc = v4(0.4f, 0.5f, 0.0f, 1.0f);
-
-            v4 geo_color = v4(0.1f, 0.8f, 0.0f, 1.0f);
-            Graphics::circle(col.manifold.a_in_b, 0.05f, geo_color, 1);
-            Graphics::circle(col.manifold.b_in_a, 0.05f, geo_color, 1);
-            /*
-               Graphics::line(col.manifold.a_in_b,
-               col.manifold.a_in_b + col.manifold.normal * col.manifold.pen_depth,
-               0.1f, geo_color);
-               */
-        }
-        Graphics::quad(a, ar, 0.0f, ac);
-        Graphics::quad(b, br, 0.0f, bc);
-
-    }
-
-    if(true)
-    {
-        v2 a = mouse_pos;
-        v2 ar = v2(1.0f, 1.0f);
-        v4 ac = v4(0.4f, 0.4f, 0.4f, 1.0f);
-        v2 b = v2();
-        static v2 br = v2(0.0f, 1.0f);
-        v4 bc = v4(0.4f, 0.4f, 0.4f, 1.0f);
-
-        br = rotate_vector(br, 0.01f);
-
-        Collision col;
-        bool hit;
-
-        hit = box_plane(a, v2(ar.x, 0.0f), v2(0.0f, ar.y), b, br, &col.manifold);
-        if(hit)
-        {
-            ac = v4(0.4f, 0.5f, 0.0f, 1.0f);
-            bc = v4(0.4f, 0.5f, 0.0f, 1.0f);
-
-            v4 geo_color = v4(0.1f, 0.8f, 0.0f, 1.0f);
-            Graphics::circle(col.manifold.a_in_b, 0.05f, geo_color, 1);
-            Graphics::circle(col.manifold.b_in_a, 0.05f, geo_color, 1);
-            /*
-               Graphics::line(col.manifold.a_in_b,
-               col.manifold.a_in_b + col.manifold.normal * col.manifold.pen_depth,
-               0.1f, geo_color);
-               */
-        }
-
-        v2 position = b;
-        v2 normal = br;
-        const float PLANE_SCALE = 1000.0f;
-        float plane_rotation = angle_between(normal, v2(0.0f, 1.0f));
-        if(dot(normal, v2(1.0f, 0.0f)) > 0.0f) plane_rotation *= -1.0f;
-        Graphics::quad(position - normal * PLANE_SCALE / 2.0f,
-                v2(0.5f, 0.5f) * PLANE_SCALE,
-                plane_rotation,
-                v4(0.4f, 0.4f, 0.0f, 1.0f));
-        Graphics::quad(a, ar, 0.0f, ac);
-
-    }
+    //b.transform.position = mouse_pos;
+    Graphics::circle(b.transform.position, circle->radius, Color::YELLOW);
+    Graphics::line(v2(), mouse_pos, 0.1f, Color::YELLOW);
 }
 #endif
 
@@ -244,7 +123,7 @@ void Level::reset()
     //srand((unsigned)time(NULL));
     srand(1);
 #if 1
-    for(int i = 0; i < 5; i++)
+    for(int i = 0; i < 500; i++)
     {
         Body *body = make_body();
         body->transform.position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
@@ -253,7 +132,7 @@ void Level::reset()
 
         Circle *circle = new Circle();
         body->shape = circle;
-        circle->radius = 0.5f;
+        circle->radius = 0.05f;
     }
 #endif
 
@@ -264,7 +143,7 @@ void Level::reset()
     mouse_body_index = bodies.size() - 1;
 
 #if 1
-    for(int i = 0; i < 5; i++)
+    for(int i = 0; i < 500; i++)
     {
         Body *body = make_body();
         body->transform.position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
@@ -273,7 +152,7 @@ void Level::reset()
 
         Box *box = new Box();
         body->shape = box;
-        box->half_extents = v2(0.5f, 0.5f);
+        box->half_extents = v2(0.05f, 0.05f);
     }
 #endif
 
@@ -294,8 +173,16 @@ void Level::step(float time_step)
 
     //bodies.back()->position = mouse_pos;
 
+/*
+    quad_tree->clear();
+    for(const Body *body : bodies)
+    {
+        quad_tree->add(body);
+    }
 
-#if 1
+*/
+
+#if 0
     static Collision d_col;
     //if((last_mouse_pos.x < 0.0f && mouse_pos.x > 0.0f) || mouse_pos.y > 5.0f)
     {
@@ -322,6 +209,7 @@ void Level::step(float time_step)
 
             // Collision detection
             std::vector<Collision> collisions;
+#if 1
             for(int i = 0; i < bodies.size(); i++)
             {
                 for(int j = i + 1; j < bodies.size(); j++)
@@ -346,6 +234,12 @@ void Level::step(float time_step)
                     }
                 }
             }
+#else
+            for(Body *body : bodies)
+            {
+                quad_tree->query(body->shape.bounding_box, &collisions);
+            }
+#endif
 
             {
                 Body *mouse_body = bodies[mouse_body_index]; 
@@ -490,42 +384,14 @@ void Level::step(float time_step)
 
 void Level::draw()
 {
+#if 0
     for(Body *body : bodies)
     {
         body->draw();
     }
-#if 0
-    for(const Body *body : bodies)
-    {
-        if(body->shape == Body::CIRCLE)
-        {
-            Graphics::circle(body->transform.position, body->circle.radius, v4(0.5f, 0.0f, 1.0f, 1.0f));
-        }
-        else if(body->shape == Body::BOX)
-        {
-            Graphics::quad(body->transform.position, body->box.up + body->box.right, 0.0f, v4(0.5f, 0.0f, 1.0f, 1.0f));
-        }
-        else if(body->shape == Body::PLANE)
-        {
-            v2 transform.position = body->transform.position;
-            v2 normal = body->plane.normal;
-            const float PLANE_SCALE = 1000.0f;
-            float plane_rotation = angle_between(normal, v2(0.0f, 1.0f));
-            if(dot(normal, v2(1.0f, 0.0f)) > 0.0f) plane_rotation *= -1.0f;
-            Graphics::quad(transform.position - normal * PLANE_SCALE / 2.0f,
-                    v2(0.5f, 0.5f) * PLANE_SCALE,
-                    plane_rotation,
-                    v4(0.4f, 0.4f, 0.0f, 1.0f));
-        }
-    }
-
-    //for(Circle &circle : circles) circle.draw();
-
-    v2 mouse_pos = Graphics::mouse_world_position();
-    Graphics::circle(mouse_pos, 0.1f, v4(0.5f, 0.0f, 1.0f, 0.3f));
 #endif
 
-#if 0
+#if 1
     draw_debug_scenarios();
 #endif
 };

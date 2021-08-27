@@ -3,6 +3,16 @@
 
 #include "game_math.h"
 
+struct Color
+{
+    static const GameMath::v4 RED;
+    static const GameMath::v4 ORANGE;
+    static const GameMath::v4 YELLOW;
+    static const GameMath::v4 GREEN;
+    static const GameMath::v4 BLUE;
+    static const GameMath::v4 PURPLE;
+};
+
 struct Graphics
 {
     static struct GraphicsState *instance;
@@ -18,6 +28,7 @@ struct Graphics
 
     static void quad(GameMath::v2 position, GameMath::v2 half_extents, float rotation, GameMath::v4 color, int layer = 0);
     static void circle(GameMath::v2 position, float radius, GameMath::v4 color, int layer = 0);
+    static void line(GameMath::v2 a, GameMath::v2 b, float half_width, GameMath::v4 color, int layer = 0);
 
     static GameMath::mat4 view_m_world();
     static GameMath::mat4 world_m_view();

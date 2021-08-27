@@ -8,9 +8,15 @@
 
 #include "level.h"
 
+#include <GLFW/glfw3.h>
 #include <windows.h>
 
 using namespace GameMath;
+
+float get_time()
+{
+    return glfwGetTime();
+}
 
 INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nCmdShow)
 {
@@ -24,16 +30,26 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
     level->init();
 
     // Main loop
+    float timer = 0.0f;
+    float last_time = 0.0f;
+    const static float STEP_TIME = 0.016f;
     while(!Graphics::wants_to_close())
     {
-        Graphics::clear_frame(v4(0.0f, 0.0f, 0.05f, 1.0f));
+        float current_time = get_time();
+        timer += current_time - last_time;
+        last_time = current_time;
 
-        level->step(0.016f);
-        level->draw();
+        if(timer >= STEP_TIME)
+        {
+            timer -= STEP_TIME;
 
-        Graphics::render();
+            level->step(STEP_TIME);
+            level->draw();
 
-        Graphics::swap_frames();
+            Graphics::clear_frame(v4(0.0f, 0.0f, 0.05f, 1.0f));
+            Graphics::render();
+            Graphics::swap_frames();
+        }
     }
 
     level->uninit();

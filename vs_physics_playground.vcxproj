@@ -105,6 +105,14 @@
       <AdditionalDependencies>opengl32.lib;lib\glfw-3.3.4.bin.WIN64\lib-vc2019\glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>src;lib\glad\include;lib\glfw-3.3.4.bin.WIN64\include;lib\imgui;lib\stb</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>opengl32.lib;lib\glfw-3.3.4.bin.WIN64\lib-vc2019\glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="lib\glad\src\glad.c" />
     <ClCompile Include="lib\imgui\examples\imgui_impl_opengl3.cpp" />
