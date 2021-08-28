@@ -51,7 +51,6 @@ struct GraphicsState
     float screen_aspect_ratio;
 
     Texture *white_texture;
-
     v2 mouse_screen_position;
 
     Shader *batch_quad_shader;
@@ -64,6 +63,17 @@ struct GraphicsState
         float rotation;
     };
 
+    Shader *batch_quad_outline_shader;
+    ObjectBuffer *batch_quad_outline_buffer;
+    struct QuadOutlineRenderingData
+    {
+        v2 position;
+        v2 half_extents;
+        v4 color;
+        float rotation;
+        float thickness;
+    };
+
     Shader *batch_circle_shader;
     ObjectBuffer *batch_circle_buffer;
     struct CircleRenderingData
@@ -73,7 +83,17 @@ struct GraphicsState
         v4 color;
     };
 
-     Shader *batch_line_shader;
+    Shader *batch_circle_outline_shader;
+    ObjectBuffer *batch_circle_outline_buffer;
+    struct CircleOutlineRenderingData
+    {
+        v2 position;
+        float radius;
+        v4 color;
+        float thickness;
+    };
+
+    Shader *batch_line_shader;
     ObjectBuffer *batch_line_buffer;
     struct LineRenderingData
     {
@@ -84,7 +104,9 @@ struct GraphicsState
     };
 
     void render_quad_batch(std::vector<QuadRenderingData> *packed_data);
+    void render_quad_outline_batch(std::vector<QuadOutlineRenderingData> *packed_data);
     void render_circle_batch(std::vector<CircleRenderingData> *packed_data);
+    void render_circle_outline_batch(std::vector<CircleOutlineRenderingData> *packed_data);
     void render_line_batch(std::vector<LineRenderingData> *packed_data);
 
     struct LayerGroup
@@ -95,10 +117,26 @@ struct GraphicsState
             quads_packed_buffer.push_back({quad->position, quad->half_extents, quad->color, quad->rotation});
         }
 
+        std::vector<GraphicsState::QuadOutlineRenderingData> quad_outlines_packed_buffer;
+        void pack_quad_outline(QuadOutlineRenderingData *quad_outline)
+        {
+            quad_outlines_packed_buffer.push_back({quad_outline->position,
+                    quad_outline->half_extents, quad_outline->color,
+                    quad_outline->rotation, quad_outline->thickness});
+        }
+
         std::vector<GraphicsState::CircleRenderingData> circles_packed_buffer;
         void pack_circle(CircleRenderingData *circle)
         {
             circles_packed_buffer.push_back({circle->position, circle->radius, circle->color});
+        }
+
+        std::vector<GraphicsState::CircleOutlineRenderingData> circle_outlines_packed_buffer;
+        void pack_circle_outline(CircleOutlineRenderingData *circle_outline)
+        {
+            circle_outlines_packed_buffer.push_back({circle_outline->position,
+                    circle_outline->radius, circle_outline->color,
+                    circle_outline->thickness});
         }
 
         std::vector<GraphicsState::LineRenderingData> lines_packed_buffer;
@@ -435,6 +473,32 @@ void GraphicsState::render_quad_batch(std::vector<GraphicsState::QuadRenderingDa
     glDrawArrays(GL_POINTS, 0, packed_data->size());
 }
 
+void GraphicsState::render_quad_outline_batch(std::vector<GraphicsState::QuadOutlineRenderingData> *packed_data)
+{
+    if(packed_data->empty()) return;
+
+    Shader *shader = batch_quad_outline_shader;
+    ObjectBuffer *object_buffer = batch_quad_outline_buffer;
+
+    use_shader(shader);
+    mat4 project_m_world = Graphics::ndc_m_world();
+    set_uniform(shader, "vp", project_m_world);
+
+    glBindVertexArray(object_buffer->vao);
+    check_gl_errors("use vao");
+    glBindBuffer(GL_ARRAY_BUFFER, object_buffer->vbo);
+    int bytes = sizeof((*packed_data)[0]) * packed_data->size();
+    assert(bytes <= (object_buffer->bytes_capacity));
+    glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, packed_data->data());
+    check_gl_errors("send quad outline data");
+
+    use_texture(white_texture);
+
+    glFinish();
+
+    glDrawArrays(GL_POINTS, 0, packed_data->size());
+}
+
 void GraphicsState::render_circle_batch(std::vector<CircleRenderingData> *packed_data)
 {
     if(packed_data->empty()) return;
@@ -453,6 +517,30 @@ void GraphicsState::render_circle_batch(std::vector<CircleRenderingData> *packed
     assert(bytes <= (object_buffer->bytes_capacity));
     glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, packed_data->data());
     check_gl_errors("send circle data");
+
+    glFinish();
+
+    glDrawArrays(GL_POINTS, 0, packed_data->size());
+}
+
+void GraphicsState::render_circle_outline_batch(std::vector<CircleOutlineRenderingData> *packed_data)
+{
+    if(packed_data->empty()) return;
+
+    Shader *shader = batch_circle_outline_shader;
+    ObjectBuffer *object_buffer = batch_circle_outline_buffer;
+
+    use_shader(shader);
+    mat4 project_m_world = Graphics::ndc_m_world();
+    set_uniform(shader, "vp", project_m_world);
+
+    glBindVertexArray(object_buffer->vao);
+    check_gl_errors("use vao");
+    glBindBuffer(GL_ARRAY_BUFFER, object_buffer->vbo);
+    int bytes = sizeof((*packed_data)[0]) * packed_data->size();
+    assert(bytes <= (object_buffer->bytes_capacity));
+    glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, packed_data->data());
+    check_gl_errors("send circle outline data");
 
     glFinish();
 
@@ -509,11 +597,26 @@ void Graphics::quad(v2 position, v2 half_extents, float rotation, v4 color, int 
     group->pack_quad(&data);
 }
 
+void Graphics::quad_outline(v2 position, v2 half_extents, float rotation, v4 color, float thickness, int layer)
+{
+    GraphicsState::LayerGroup *group = get_or_add_layer_group(layer);
+    v2 scale = half_extents * 2.0f;
+    GraphicsState::QuadOutlineRenderingData data = {position, scale, color, rotation, thickness};
+    group->pack_quad_outline(&data);
+}
+
 void Graphics::circle(v2 position, float radius, v4 color, int layer)
 {
     GraphicsState::LayerGroup *group = get_or_add_layer_group(layer);
     GraphicsState::CircleRenderingData data = {position, radius, color};
     group->pack_circle(&data);
+}
+
+void Graphics::circle_outline(v2 position, float radius, v4 color, float thickness, int layer)
+{
+    GraphicsState::LayerGroup *group = get_or_add_layer_group(layer);
+    GraphicsState::CircleOutlineRenderingData data = {position, radius, color, thickness};
+    group->pack_circle_outline(&data);
 }
 
 void Graphics::line(v2 a, v2 b, float half_width, v4 color, int layer)
@@ -589,7 +692,9 @@ bool Graphics::init()
     instance->objects_to_render = new std::map<int, GraphicsState::LayerGroup *>();
 
     instance->batch_quad_shader = make_shader("assets/shaders/batch_quad.shader");
+    instance->batch_quad_outline_shader = make_shader("assets/shaders/batch_quad_outline.shader");
     instance->batch_circle_shader = make_shader("assets/shaders/batch_circle.shader");
+    instance->batch_circle_outline_shader = make_shader("assets/shaders/batch_circle_outline.shader");
     instance->batch_line_shader = make_shader("assets/shaders/batch_line.shader");
 
 
@@ -603,7 +708,7 @@ bool Graphics::init()
         glGenBuffers(1, &instance->batch_quad_buffer->vbo);
         check_gl_errors("making vbo");
 
-        static const int MAX_QUADS = 1024 * 10;
+        static const int MAX_QUADS = 1024 * 1;
         glBindBuffer(GL_ARRAY_BUFFER, instance->batch_quad_buffer->vbo);
         glBufferData(GL_ARRAY_BUFFER, MAX_QUADS * sizeof(GraphicsState::QuadRenderingData), nullptr, GL_DYNAMIC_DRAW);
         check_gl_errors("send vbo data");
@@ -621,6 +726,36 @@ bool Graphics::init()
         check_gl_errors("vertex attrib pointer");
     }
 
+    // Make quad outline object buffer
+    {
+        instance->batch_quad_outline_buffer = new ObjectBuffer();
+        glGenVertexArrays(1, &instance->batch_quad_outline_buffer->vao);
+        glBindVertexArray(instance->batch_quad_outline_buffer->vao);
+        check_gl_errors("making vao");
+
+        glGenBuffers(1, &instance->batch_quad_outline_buffer->vbo);
+        check_gl_errors("making vbo");
+
+        static const int MAX_QUAD_OUTLINES = 1024 * 1;
+        glBindBuffer(GL_ARRAY_BUFFER, instance->batch_quad_outline_buffer->vbo);
+        glBufferData(GL_ARRAY_BUFFER, MAX_QUAD_OUTLINES * sizeof(GraphicsState::QuadOutlineRenderingData), nullptr, GL_DYNAMIC_DRAW);
+        check_gl_errors("send vbo data");
+        instance->batch_quad_outline_buffer->bytes_capacity = MAX_QUAD_OUTLINES * sizeof(GraphicsState::QuadOutlineRenderingData);
+
+        float stride = sizeof(GraphicsState::QuadOutlineRenderingData);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, (void *)0); // Position
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, (void *)(1 * sizeof(v2))); // Scale
+        glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, stride, (void *)(2 * sizeof(v2))); // Color
+        glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, stride, (void *)(2 * sizeof(v2) + sizeof(v4))); // Rotation
+        glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, stride, (void *)(2 * sizeof(v2) + sizeof(v4) + sizeof(float))); // Thickness
+        glEnableVertexAttribArray(0);
+        glEnableVertexAttribArray(1);
+        glEnableVertexAttribArray(2);
+        glEnableVertexAttribArray(3);
+        glEnableVertexAttribArray(4);
+        check_gl_errors("vertex attrib pointer");
+    }
+
     // Make circle object buffer
     {
         instance->batch_circle_buffer = new ObjectBuffer();
@@ -631,7 +766,7 @@ bool Graphics::init()
         glGenBuffers(1, &instance->batch_circle_buffer->vbo);
         check_gl_errors("making vbo");
 
-        static const int MAX_CIRCLES = 1024 * 10;
+        static const int MAX_CIRCLES = 1024 * 1;
         glBindBuffer(GL_ARRAY_BUFFER, instance->batch_circle_buffer->vbo);
         glBufferData(GL_ARRAY_BUFFER, MAX_CIRCLES * sizeof(GraphicsState::CircleRenderingData), nullptr, GL_DYNAMIC_DRAW);
         check_gl_errors("send vbo data");
@@ -644,6 +779,34 @@ bool Graphics::init()
         glEnableVertexAttribArray(0);
         glEnableVertexAttribArray(1);
         glEnableVertexAttribArray(2);
+        check_gl_errors("vertex attrib pointer");
+    }
+
+    // Make circle outline object buffer
+    {
+        instance->batch_circle_outline_buffer = new ObjectBuffer();
+        glGenVertexArrays(1, &instance->batch_circle_outline_buffer->vao);
+        glBindVertexArray(instance->batch_circle_outline_buffer->vao);
+        check_gl_errors("making vao");
+
+        glGenBuffers(1, &instance->batch_circle_outline_buffer->vbo);
+        check_gl_errors("making vbo");
+
+        static const int MAX_CIRCLE_OUTLINES = 1024 * 1;
+        glBindBuffer(GL_ARRAY_BUFFER, instance->batch_circle_outline_buffer->vbo);
+        glBufferData(GL_ARRAY_BUFFER, MAX_CIRCLE_OUTLINES * sizeof(GraphicsState::CircleOutlineRenderingData), nullptr, GL_DYNAMIC_DRAW);
+        check_gl_errors("send vbo data");
+        instance->batch_circle_outline_buffer->bytes_capacity = MAX_CIRCLE_OUTLINES * sizeof(GraphicsState::CircleOutlineRenderingData);
+
+        float stride = sizeof(GraphicsState::CircleOutlineRenderingData);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, (void *)0); // Position
+        glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, stride, (void *)(2 * sizeof(float))); // Radius
+        glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, stride, (void *)(3 * sizeof(float))); // Color
+        glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, stride, (void *)(7 * sizeof(float) + sizeof(float))); // Thickness
+        glEnableVertexAttribArray(0);
+        glEnableVertexAttribArray(1);
+        glEnableVertexAttribArray(2);
+        glEnableVertexAttribArray(3);
         check_gl_errors("vertex attrib pointer");
     }
 
@@ -708,9 +871,17 @@ void Graphics::render()
         instance->render_quad_batch(&group->quads_packed_buffer);
         group->quads_packed_buffer.clear();
 
+        // Render all quad outlines
+        instance->render_quad_outline_batch(&group->quad_outlines_packed_buffer);
+        group->quad_outlines_packed_buffer.clear();
+
         // Render all circles
         instance->render_circle_batch(&group->circles_packed_buffer);
         group->circles_packed_buffer.clear();
+
+        // Render all circles
+        instance->render_circle_outline_batch(&group->circle_outlines_packed_buffer);
+        group->circle_outlines_packed_buffer.clear();
 
         // Render all lines
         instance->render_line_batch(&group->lines_packed_buffer);

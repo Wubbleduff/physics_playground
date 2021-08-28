@@ -27,7 +27,9 @@ struct Graphics
     static bool wants_to_close();
 
     static void quad(GameMath::v2 position, GameMath::v2 half_extents, float rotation, GameMath::v4 color, int layer = 0);
+    static void quad_outline(GameMath::v2 position, GameMath::v2 half_extents, float rotation, GameMath::v4 color, float thickness, int layer = 0);
     static void circle(GameMath::v2 position, float radius, GameMath::v4 color, int layer = 0);
+    static void circle_outline(GameMath::v2 position, float radius, GameMath::v4 color, float thickness, int layer = 0);
     static void line(GameMath::v2 a, GameMath::v2 b, float half_width, GameMath::v4 color, int layer = 0);
 
     static GameMath::mat4 view_m_world();

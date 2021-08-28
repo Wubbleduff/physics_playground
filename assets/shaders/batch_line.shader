@@ -66,32 +66,36 @@ void main() {
     vec4 line_d = normalize(line_b - line_a) * width / 2.0f;
     vec4 line_n = vec4(-line_d.y, line_d.x, 0.0f, 0.0f);
 
-    m_line_a = gs_in[0].line_a;
-    m_line_b = gs_in[0].line_b;
+    // Move the end points inward such that the start and end points are on the edges of the circular line ends
+    line_a = line_a + line_d;
+    line_b = line_b - line_d;
+
+    m_line_a = gs_in[0].line_a + vec2(line_d.x, line_d.y);
+    m_line_b = gs_in[0].line_b - vec2(line_d.x, line_d.y);
     m_rect_pos = (line_a + line_n - line_d).xy;
     m_rect_width = width;
     m_color = v_color;
     gl_Position = vp * (line_a + line_n - line_d);
     EmitVertex();
 
-    m_line_a = gs_in[0].line_a;
-    m_line_b = gs_in[0].line_b;
+    m_line_a = gs_in[0].line_a + vec2(line_d.x, line_d.y);
+    m_line_b = gs_in[0].line_b - vec2(line_d.x, line_d.y);
     m_rect_pos = (line_a - line_n - line_d).xy;
     m_rect_width = width;
     m_color = v_color;
     gl_Position = vp * (line_a - line_n - line_d);
     EmitVertex();
 
-    m_line_a = gs_in[0].line_a;
-    m_line_b = gs_in[0].line_b;
+    m_line_a = gs_in[0].line_a + vec2(line_d.x, line_d.y);
+    m_line_b = gs_in[0].line_b - vec2(line_d.x, line_d.y);
     m_rect_pos = (line_b + line_n + line_d).xy;
     m_rect_width = width;
     m_color = v_color;
     gl_Position = vp * (line_b + line_n + line_d);
     EmitVertex();
 
-    m_line_a = gs_in[0].line_a;
-    m_line_b = gs_in[0].line_b;
+    m_line_a = gs_in[0].line_a + vec2(line_d.x, line_d.y);
+    m_line_b = gs_in[0].line_b - vec2(line_d.x, line_d.y);
     m_rect_pos = (line_b - line_n + line_d).xy;
     m_rect_width = width;
     m_color = v_color;

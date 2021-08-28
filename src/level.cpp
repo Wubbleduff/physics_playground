@@ -37,10 +37,11 @@ static void draw_debug_scenarios()
     Circle *circle = new Circle;
     b.shape = circle;
 
-    //Graphics::quad(a.transform.position, box->half_extents, 0.0f, Color::YELLOW);
+    Graphics::quad_outline(a.transform.position, box->half_extents, 0.0f, Color::YELLOW, 0.01f);
 
-    //b.transform.position = mouse_pos;
-    Graphics::circle(b.transform.position, circle->radius, Color::YELLOW);
+    b.transform.position = mouse_pos;
+    Graphics::circle_outline(b.transform.position, circle->radius, Color::YELLOW, 0.01f);
+
     Graphics::line(v2(), mouse_pos, 0.1f, Color::YELLOW);
 }
 #endif
