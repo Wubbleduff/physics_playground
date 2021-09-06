@@ -87,7 +87,7 @@ void Level::reset()
     for(Body *b : bodies) delete b;
     bodies.clear();
 
-#if 0
+#if 1
     for(int i = 0; i < 4; i++)
     {
         Body *body = make_body();
@@ -126,7 +126,7 @@ void Level::reset()
     //srand((unsigned)time(NULL));
     srand(1);
 #if 1
-    for(int i = 0; i < 1; i++)
+    for(int i = 0; i < 100; i++)
     {
         Body *body = make_body();
         body->transform.position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
@@ -136,7 +136,7 @@ void Level::reset()
 
         Circle *circle = new Circle();
         body->shape = circle;
-        circle->radius = 0.1f;
+        circle->radius = 0.25f;
     }
 #endif
 
@@ -192,7 +192,7 @@ void Level::step(float time_step)
     static Collision d_col;
     //if((last_mouse_pos.x < 0.0f && mouse_pos.x > 0.0f) || mouse_pos.y > 5.0f)
     {
-        int iters = 1;
+        int iters = 8;
         for(int i = 0 ; i < iters; i++)
         {
             float divided_time_step = time_step / iters;
@@ -202,7 +202,7 @@ void Level::step(float time_step)
             {
                 if(body->is_static) continue;
 
-                static const float SMALLEST_SPEED = 0.001f;
+                static const float SMALLEST_SPEED = 0.00001f;
                 if(length(body->velocity) < SMALLEST_SPEED)
                 {
                     body->velocity = v2();
@@ -258,16 +258,16 @@ void Level::step(float time_step)
 #if 1
             {
                 Body *body = bodies[bodies.size() - 1];
-                v2 mouse_diff = body->transform.position - mouse_pos;              
-                float rope_len = 2.0f;
+                v2 mouse_diff = body->transform.position - mouse_pos;
+                float rope_len = 1.0f;
                 if(length(mouse_diff) >= rope_len)
                 {
                     v2 target = mouse_pos + normalize(mouse_diff) * rope_len;
                     v2 body_to_target = target - body->transform.position;
-                    float velocity_along_direction = dot(normalize(body_to_target), body->velocity*divided_time_step);
-                    float resolve_magnitude = length(body_to_target) - velocity_along_direction;
-                    body->velocity += normalize(body_to_target) * resolve_magnitude;
-                    body->transform.position += normalize(body_to_target) * resolve_magnitude;
+                    body->velocity += body_to_target * (1.0f / iters);
+
+                    float percent = 0.8f;
+                    body->transform.position += body_to_target * percent;
                 }
                 Graphics::line(mouse_pos, body->transform.position, 0.01f, Color::YELLOW);
             }
