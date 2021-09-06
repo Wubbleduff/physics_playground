@@ -87,6 +87,7 @@ void Level::reset()
     for(Body *b : bodies) delete b;
     bodies.clear();
 
+#if 0
     for(int i = 0; i < 4; i++)
     {
         Body *body = make_body();
@@ -119,31 +120,35 @@ void Level::reset()
                 break;
         }
     }
+#endif
 
 
     //srand((unsigned)time(NULL));
     srand(1);
 #if 1
-    for(int i = 0; i < 500; i++)
+    for(int i = 0; i < 1; i++)
     {
         Body *body = make_body();
         body->transform.position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
-        body->velocity = v2(random_range(-5.0f, 5.0f), random_range(-5.0f, 5.0f));
-        body->mass = 1.0f;
+        //body->velocity = v2(random_range(-5.0f, 5.0f), random_range(-5.0f, 5.0f));
+        body->velocity = v2();
+        body->mass = 0.1f;
 
         Circle *circle = new Circle();
         body->shape = circle;
-        circle->radius = 0.05f;
+        circle->radius = 0.1f;
     }
 #endif
 
+    /*
     Body *mouse_body = make_body();
     Circle *mouse_shape = new Circle();
     mouse_shape->radius = 0.1f;
     mouse_body->shape = mouse_shape;
     mouse_body_index = bodies.size() - 1;
+    */
 
-#if 1
+#if 0
     for(int i = 0; i < 500; i++)
     {
         Body *body = make_body();
@@ -183,11 +188,11 @@ void Level::step(float time_step)
 
 */
 
-#if 0
+#if 1
     static Collision d_col;
     //if((last_mouse_pos.x < 0.0f && mouse_pos.x > 0.0f) || mouse_pos.y > 5.0f)
     {
-        int iters = 8;
+        int iters = 1;
         for(int i = 0 ; i < iters; i++)
         {
             float divided_time_step = time_step / iters;
@@ -203,9 +208,9 @@ void Level::step(float time_step)
                     body->velocity = v2();
                 }
 
-                body->velocity.y += -9.81f * divided_time_step;
+                body->velocity.y += -9.81f * divided_time_step * divided_time_step;
                 body->velocity -= body->velocity * 1.0f * divided_time_step;
-                body->transform.position += body->velocity * divided_time_step;
+                body->transform.position += body->velocity;
             }
 
             // Collision detection
@@ -242,25 +247,31 @@ void Level::step(float time_step)
             }
 #endif
 
+#if 0
             {
                 Body *mouse_body = bodies[mouse_body_index]; 
                 v2 mouse_velocity = (mouse_pos - mouse_body->transform.position) * 1.0f / time_step;
                 mouse_body->velocity = mouse_velocity;
-
-                /*
-                Body *body = bodies[bodies.size() - 2];
-                v2 mouse_diff = body->transform.position - mouse_body->transform.position;
-                if(length(mouse_diff) >= 3.0f)
-                {
-                    Collision col;
-                    col.manifold.a_in_b = body->transform.position;
-                    col.manifold.b_in_a = mouse_pos + normalize(mouse_diff) * 3.0f;
-                    col.a = mouse_body;
-                    col.b = body;
-                    collisions.push_back(col);
-                }
-                */
             }
+#endif
+
+#if 1
+            {
+                Body *body = bodies[bodies.size() - 1];
+                v2 mouse_diff = body->transform.position - mouse_pos;              
+                float rope_len = 2.0f;
+                if(length(mouse_diff) >= rope_len)
+                {
+                    v2 target = mouse_pos + normalize(mouse_diff) * rope_len;
+                    v2 body_to_target = target - body->transform.position;
+                    float velocity_along_direction = dot(normalize(body_to_target), body->velocity*divided_time_step);
+                    float resolve_magnitude = length(body_to_target) - velocity_along_direction;
+                    body->velocity += normalize(body_to_target) * resolve_magnitude;
+                    body->transform.position += normalize(body_to_target) * resolve_magnitude;
+                }
+                Graphics::line(mouse_pos, body->transform.position, 0.01f, Color::YELLOW);
+            }
+#endif
 
             // Collision resolution
             // Impulse
@@ -385,14 +396,14 @@ void Level::step(float time_step)
 
 void Level::draw()
 {
-#if 0
+#if 1
     for(Body *body : bodies)
     {
         body->draw();
     }
 #endif
 
-#if 1
+#if 0
     draw_debug_scenarios();
 #endif
 };
