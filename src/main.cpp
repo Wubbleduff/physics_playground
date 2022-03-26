@@ -8,8 +8,8 @@
 
 #include "level.h"
 
-#include <GLFW/glfw3.h>
 #include <windows.h>
+#include <GLFW/glfw3.h>
 
 using namespace GameMath;
 
