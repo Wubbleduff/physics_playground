@@ -19,6 +19,7 @@ namespace GameMath
         v2() : x(0.0f), y(0.0f) { }
         v2(const v2 &v) : x(v.x), y(v.y) { }
         v2(float in_x, float in_y) : x(in_x), y(in_y) { }
+        v2(float c[2]) : x(c[0]), y(c[1]) { }
     };
 
     struct v3

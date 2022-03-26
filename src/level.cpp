@@ -1,7 +1,6 @@
 
 #include "level.h"
 #include "graphics.h"
-#include "rigid_body.h"
 
 #include <cstdio>
 #include <cassert>
@@ -23,7 +22,7 @@ static void swap(T &a, T &b)
 
 
 
-#if 1
+#if 0
 static void draw_debug_scenarios()
 {
     v2 mouse_pos = Graphics::mouse_world_position();
@@ -51,27 +50,29 @@ static void draw_debug_scenarios()
 
 
 
-Body *Level::make_body()
+uint32_t Level::make_body()
 {
-    Body *body = new Body;
+    RigidBody body;
 
-    body->is_static = false;
+    body.is_static = false;
 
-    body->transform.position = v2();
-    body->velocity = v2();
-    body->mass = 1.0f;
+    body.position = v2();
+    body.velocity = v2();
+    body.mass = 1.0f;
 
-    body->shape = nullptr;
+    body.shape.type = Shape::NONE;
 
     bodies.push_back(body);
 
-    return body;
+    return bodies.size() - 1;
 }
 
+/*
 void Level::destroy_body(Body *body)
 {
     delete body;
 }
+*/
 
 void Level::init()
 {
@@ -84,84 +85,61 @@ void Level::uninit()
 
 void Level::reset()
 {
-    for(Body *b : bodies) delete b;
     bodies.clear();
 
-#if 1
     for(int i = 0; i < 4; i++)
     {
-        Body *body = make_body();
+        uint32_t body_id = make_body();
+        RigidBody *body = &(bodies[body_id]);
 
         body->is_static = true;
         body->velocity = v2();
         body->mass = 0.0f;
 
-        Plane *plane = new Plane();
-        body->shape = plane;
+        body->shape.type = Shape::PLANE;
+        Shape::Plane *plane = &(body->shape.plane);
 
         float pad = 0.1f;
         switch(i)
         {
             case 0:
-                body->transform.position = v2(0.0f, -Graphics::Camera::height() / 2.0f + pad);
-                plane->normal = v2(0.0f, 1.0f);
+                body->position = v2(0.0f, -Graphics::Camera::height() / 2.0f + pad);
+                plane->normal[0] = 0.0f;
+                plane->normal[1] = 1.0f;
                 break;
             case 1:
-                body->transform.position = v2(Graphics::Camera::width() / 2.0f - pad, 0.0f);
-                plane->normal = v2(-1.0f, 0.0f);
+                body->position = v2(Graphics::Camera::width() / 2.0f - pad, 0.0f);
+                plane->normal[0] = -1.0f;
+                plane->normal[1] = 0.0f;
                 break;
             case 2:
-                body->transform.position = v2(0.0f,  Graphics::Camera::height() / 2.0f - pad);
-                plane->normal = v2(0.0f, -1.0f);
+                body->position = v2(0.0f,  Graphics::Camera::height() / 2.0f - pad);
+                plane->normal[0] = 0.0f;
+                plane->normal[1] = -1.0f;
                 break;
             case 3:
-                body->transform.position = v2(-Graphics::Camera::width() / 2.0f + pad, 0.0f);
-                plane->normal = v2(1.0f, 0.0f);
+                body->position = v2(-Graphics::Camera::width() / 2.0f + pad, 0.0f);
+                plane->normal[0] = 1.0f;
+                plane->normal[1] = 0.0f;
                 break;
         }
     }
-#endif
 
-
-    //srand((unsigned)time(NULL));
     srand(1);
-#if 1
+
     for(int i = 0; i < 100; i++)
     {
-        Body *body = make_body();
-        body->transform.position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
+        uint32_t body_id = make_body();
+        RigidBody *body = &(bodies[body_id]);
+
+        body->position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
         //body->velocity = v2(random_range(-5.0f, 5.0f), random_range(-5.0f, 5.0f));
         body->velocity = v2();
         body->mass = 0.1f;
 
-        Circle *circle = new Circle();
-        body->shape = circle;
-        circle->radius = 0.25f;
+        body->shape.type = Shape::CIRCLE;
+        body->shape.circle.radius = 0.25f;
     }
-#endif
-
-    /*
-    Body *mouse_body = make_body();
-    Circle *mouse_shape = new Circle();
-    mouse_shape->radius = 0.1f;
-    mouse_body->shape = mouse_shape;
-    mouse_body_index = bodies.size() - 1;
-    */
-
-#if 0
-    for(int i = 0; i < 500; i++)
-    {
-        Body *body = make_body();
-        body->transform.position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
-        body->velocity = v2(random_range(-5.0f, 5.0f), random_range(-5.0f, 5.0f));
-        body->mass = 1.0f;
-
-        Box *box = new Box();
-        body->shape = box;
-        box->half_extents = v2(0.05f, 0.05f);
-    }
-#endif
-
 }
 
 void Level::step(float time_step)
@@ -188,7 +166,13 @@ void Level::step(float time_step)
 
 */
 
-#if 1
+    
+    solve_rigid_body_physics(bodies.data(), bodies.size(), time_step, 8);
+    return;
+
+
+
+#if 0
     static Collision d_col;
     //if((last_mouse_pos.x < 0.0f && mouse_pos.x > 0.0f) || mouse_pos.y > 5.0f)
     {
@@ -215,7 +199,6 @@ void Level::step(float time_step)
 
             // Collision detection
             std::vector<Collision> collisions;
-#if 1
             for(int i = 0; i < bodies.size(); i++)
             {
                 for(int j = i + 1; j < bodies.size(); j++)
@@ -240,22 +223,9 @@ void Level::step(float time_step)
                     }
                 }
             }
-#else
-            for(Body *body : bodies)
-            {
-                quad_tree->query(body->shape.bounding_box, &collisions);
-            }
-#endif
-
-#if 0
-            {
-                Body *mouse_body = bodies[mouse_body_index]; 
-                v2 mouse_velocity = (mouse_pos - mouse_body->transform.position) * 1.0f / time_step;
-                mouse_body->velocity = mouse_velocity;
-            }
-#endif
 
 #if 1
+            // Rope
             {
                 Body *body = bodies[bodies.size() - 1];
                 v2 mouse_diff = body->transform.position - mouse_pos;
@@ -302,48 +272,9 @@ void Level::step(float time_step)
                 {
                     collision.b->velocity += impulse * b_inv_mass;
                 }
-
-                // Friction
-#if 0
-                relative_velocity = collision.a->velocity - collision.b->velocity;
-
-                v2 tangent = relative_velocity - dot(relative_velocity, normal) * normal;
-                tangent = normalize(tangent);
-
-                float f_vel = dot(relative_velocity, tangent);
-
-                float a_sf = 0.1f;
-                float b_sf = 0.1f;
-                float a_df = 0.1f;
-                float b_df = 0.1f;
-                float mu  = length(v2(a_sf, b_sf));
-
-                float f  = -f_vel / (a_inv_mass + b_inv_mass);
-
-                v2 friction;
-                if(abs(f) < j * mu)
-                {
-                    friction = f * tangent;
-                }
-                else
-                {
-                    mu = length(v2(a_df, b_df));
-                    friction = -j * tangent * mu;
-                }
-
-                if(!collision.a->is_static)
-                {
-                    collision.a->velocity = collision.a->velocity - friction * a_inv_mass;
-                }
-                if(!collision.b->is_static)
-                {
-                    collision.b->velocity = collision.b->velocity + friction * b_inv_mass;
-                }
-#endif
             }
 
             // Position correction
-#if 1
             for(const Collision &collision : collisions)
             {
                 float percent = 0.8f;
@@ -380,28 +311,22 @@ void Level::step(float time_step)
                 collision.a->transform.position += correction * a_factor;
                 collision.b->transform.position -= correction * b_factor;
             }
-#endif
         }
     }
-#endif
-
-#if 0
-    Graphics::circle(d_col.manifold.a_in_b, 0.1, v4(1.0f, 0.0f, 0.0f, 1.0f), 1);
-    Graphics::circle(d_col.manifold.b_in_a, 0.1, v4(0.0f, 1.0f, 0.0f, 1.0f), 1);
-
-#endif
 
     last_mouse_pos = mouse_pos;
+#endif
 }
 
 void Level::draw()
 {
-#if 1
-    for(Body *body : bodies)
+    for(RigidBody &body : bodies)
     {
-        body->draw();
+        if(body.shape.type == Shape::CIRCLE)
+        {
+            Graphics::circle(body.position, body.shape.circle.radius, v4(0.2f, 0.0, 0.8f, 1.0f));
+        }
     }
-#endif
 
 #if 0
     draw_debug_scenarios();

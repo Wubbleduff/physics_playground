@@ -649,8 +649,8 @@ bool Graphics::init()
             return false;
         }
 
-        int window_width = 1920 * 0.5f;
-        int window_height = 1080 * 0.5f;
+        int window_width = 1920 * 0.75f;
+        int window_height = 1080 * 0.75f;
         instance->window = glfwCreateWindow(window_width, window_height, "My Game", NULL, NULL);
         if(!instance->window)
         {

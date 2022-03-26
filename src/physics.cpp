@@ -1,23 +1,25 @@
 
-#include "rigid_body.h"
-#include "graphics.h"
+#include "physics.h"
 
-#include <assert.h>
-
+#include <vector>
+#include <cassert>
 
 using namespace GameMath;
+
+
+
 static float EPSILON = 0.0001f;
 
 
 
 static bool EQ(float a, float b)
 {
-    return (abs(a - b) < EPSILON);
+    return (GameMath::abs(a - b) < EPSILON);
 }
 
 static bool EQ(v2 a, v2 b)
 {
-    return (abs(a.x - b.x) < EPSILON) && (abs(a.y - b.y) < EPSILON);
+    return (GameMath::abs(a.x - b.x) < EPSILON) && (GameMath::abs(a.y - b.y) < EPSILON);
 }
 
 
@@ -330,92 +332,197 @@ static bool box_plane(v2 a_center, v2 a_half_extents,
 
 
 
-bool Circle::collide(Transform *transform, Shape *other, Transform *other_transform, Collision::Manifold *manifold)
+bool collide_rigid_bodies(RigidBody *a, RigidBody *b, Collision::Manifold *manifold)
 {
-    return other->collide(other_transform, this, transform, manifold);
-}
+    if(a->shape.type == Shape::CIRCLE)
+    {
+        if(b->shape.type == Shape::CIRCLE)
+        {
+            return circle_circle(a->position, a->shape.circle.radius, b->position, b->shape.circle.radius, manifold);
+        }
+        if(b->shape.type == Shape::BOX)
+        {
+            return circle_box(a->position, a->shape.circle.radius, b->position, v2(b->shape.box.half_extents), manifold);
+        }
+        if(b->shape.type == Shape::PLANE)
+        {
+            return circle_plane(a->position, a->shape.circle.radius, b->position, b->shape.plane.normal, manifold);
+        }
+    }
 
-bool Circle::collide(Transform *transform, Circle *other, Transform *other_transform, Collision::Manifold *manifold)
-{
-    return circle_circle(transform->position, radius, other_transform->position, other->radius, manifold);
-}
+    if(a->shape.type == Shape::BOX)
+    {
+        if(b->shape.type == Shape::CIRCLE)
+        {
+            return circle_box(b->position, b->shape.circle.radius, a->position, v2(a->shape.box.half_extents), manifold);
+        }
+        if(b->shape.type == Shape::BOX)
+        {
+            return box_box(a->position, a->shape.box.half_extents, b->position, b->shape.box.half_extents, manifold);
+        }
+        if(b->shape.type == Shape::PLANE)
+        {
+            return box_plane(a->position, a->shape.box.half_extents, b->position, b->shape.plane.normal, manifold);
+        }
+    }
 
-bool Circle::collide(Transform *transform, Box *other, Transform *other_transform, Collision::Manifold *manifold)
-{
-    return circle_box(transform->position, radius, other_transform->position, other->half_extents, manifold);
-}
+    if(a->shape.type == Shape::PLANE)
+    {
+        if(b->shape.type == Shape::CIRCLE)
+        {
+            return circle_plane(b->position, b->shape.circle.radius, b->position, a->shape.plane.normal, manifold);
+        }
+        if(b->shape.type == Shape::BOX)
+        {
+            return box_plane(b->position, b->shape.box.half_extents, b->position, a->shape.plane.normal, manifold);
+        }
+        if(b->shape.type == Shape::PLANE)
+        {
+            return false;
+        }
+    }
 
-bool Circle::collide(Transform *transform, Plane *other, Transform *other_transform, Collision::Manifold *manifold)
-{
-    return circle_plane(transform->position, radius, other_transform->position, other->normal, manifold);
-}
-
-void Circle::draw(Transform *transform)
-{
-    Graphics::circle(transform->position, radius, v4(0.5f, 0.0f, 1.0f, 1.0f));
-}
-
-bool Box::collide(Transform *transform, Shape *other, Transform *other_transform, Collision::Manifold *manifold)
-{
-    return other->collide(other_transform, this, transform, manifold);
-}
-
-bool Box::collide(Transform *transform, Circle *other, Transform *other_transform, Collision::Manifold *manifold)
-{
-    return circle_box(other_transform->position, other->radius, transform->position, half_extents, manifold);
-}
-
-bool Box::collide(Transform *transform, Box *other, Transform *other_transform, Collision::Manifold *manifold)
-{
-    return box_box(transform->position, half_extents, other_transform->position, other->half_extents, manifold);
-}
-
-bool Box::collide(Transform *transform, Plane *other, Transform *other_transform, Collision::Manifold *manifold)
-{
-    return box_plane(transform->position, half_extents, other_transform->position, other->normal, manifold);
-}
-
-void Box::draw(Transform *transform)
-{
-    Graphics::quad(transform->position, half_extents, 0.0f, v4(0.5f, 0.0f, 1.0f, 1.0f));
-}
-
-bool Plane::collide(Transform *transform, Shape *other, Transform *other_transform, Collision::Manifold *manifold)
-{
-    return other->collide(other_transform, this, transform, manifold);
-}
-
-bool Plane::collide(Transform *transform, Circle *other, Transform *other_transform, Collision::Manifold *manifold)
-{
-    return circle_plane(other_transform->position, other->radius, transform->position, normal, manifold);
-}
-
-bool Plane::collide(Transform *transform, Box *other, Transform *other_transform, Collision::Manifold *manifold)
-{
-    return box_plane(other_transform->position, other->half_extents, transform->position, normal, manifold);
-}
-
-bool Plane::collide(Transform *transform, Plane *other, Transform *other_transform, Collision::Manifold *manifold)
-{
+    assert(false);
     return false;
 }
 
-void Plane::draw(Transform *transform)
+void solve_rigid_body_physics(RigidBody *rigid_bodies, uint32_t num_rigid_bodies, float time_step, uint32_t iters)
 {
-    const float PLANE_SCALE = 1000.0f;
-    float plane_rotation = angle_between(normal, v2(0.0f, 1.0f));
-    if(dot(normal, v2(1.0f, 0.0f)) > 0.0f) plane_rotation *= -1.0f;
-    Graphics::quad(transform->position - normal * PLANE_SCALE / 2.0f,
-            v2(0.5f, 0.5f) * PLANE_SCALE,
-            plane_rotation,
-            v4(0.4f, 0.4f, 0.0f, 1.0f));
-}
-
-void Body::draw()
-{
-    if(shape)
+    for(int i = 0 ; i < iters; i++)
     {
-        shape->draw(&transform);
+        float divided_time_step = time_step / iters;
+
+        // Kinematics
+        for(RigidBody *body = rigid_bodies; body < rigid_bodies + num_rigid_bodies; body++)
+        {
+            if(body->is_static) continue;
+
+            static const float SMALLEST_SPEED = 0.00001f;
+            if(length(body->velocity) < SMALLEST_SPEED)
+            {
+                body->velocity = v2();
+            }
+
+            body->velocity.y += -9.81f * divided_time_step * divided_time_step;
+            body->velocity -= body->velocity * 1.0f * divided_time_step;
+            body->position += body->velocity;
+        }
+
+        // Collision detection
+        std::vector<Collision> collisions;
+        for(int i = 0; i < num_rigid_bodies; i++)
+        {
+            for(int j = i + 1; j < num_rigid_bodies; j++)
+            {
+                RigidBody *a = rigid_bodies + i;
+                RigidBody *b = rigid_bodies + j;
+
+                //if(!a->shape || !b->shape) continue;
+
+                bool hit = false;
+                Collision collision = {};
+
+                //hit = a->shape->collide(&a->transform, b->shape, &b->transform, &collision.manifold);
+                hit = collide_rigid_bodies(a, b, &collision.manifold);
+
+                if(hit)
+                {
+                    collision.a = a;
+                    collision.b = b;
+                    collisions.push_back(collision);
+
+                    //d_col = collision;
+                }
+            }
+        }
+
+#if 0
+        // Rope
+        {
+            RigidBody *body = rigid_bodies + (num_rigid_bodies - 1);
+            v2 mouse_diff = body->transform.position - mouse_pos;
+            float rope_len = 1.0f;
+            if(length(mouse_diff) >= rope_len)
+            {
+                v2 target = mouse_pos + normalize(mouse_diff) * rope_len;
+                v2 body_to_target = target - body->transform.position;
+                body->velocity += body_to_target * (1.0f / iters);
+
+                float percent = 0.8f;
+                body->transform.position += body_to_target * percent;
+            }
+            Graphics::line(mouse_pos, body->transform.position, 0.01f, Color::YELLOW);
+        }
+#endif
+
+        // Collision resolution
+        // Impulse
+        for(const Collision &collision : collisions)
+        {
+            float a_inv_mass = collision.a->is_static ? 0.0f : 1.0f / collision.a->mass;
+            float b_inv_mass = collision.b->is_static ? 0.0f : 1.0f / collision.b->mass;
+            v2 relative_velocity = collision.b->velocity - collision.a->velocity;
+            v2 normal = normalize(collision.manifold.a_in_b - collision.manifold.b_in_a);
+            float n_speed = dot(relative_velocity, normal);
+
+            if(n_speed < 0.0f)
+            {
+                continue;
+            }
+
+            float e = 1.0f * 0.5f;
+            // float e = collision.a->restitution * collision.b->restitution;
+            float j = -(1.0f + e) * n_speed / (a_inv_mass + b_inv_mass);
+            v2 impulse = j * normal;
+
+            if(!collision.a->is_static)
+            {
+                collision.a->velocity -= impulse * a_inv_mass;
+            }
+
+            if(!collision.b->is_static)
+            {
+                collision.b->velocity += impulse * b_inv_mass;
+            }
+        }
+
+        // Position correction
+        for(const Collision &collision : collisions)
+        {
+            float percent = 0.8f;
+            float slop = 0.01f;
+
+            float a_factor;
+            float b_factor;
+            if(collision.a->is_static && collision.b->is_static)
+            {
+                continue;
+            }
+            else if(collision.a->is_static && !collision.b->is_static)
+            {
+                a_factor = 0.0f;
+                b_factor = 1.0f;
+            }
+            else if(collision.b->is_static && !collision.a->is_static)
+            {
+                a_factor = 1.0f;
+                b_factor = 0.0f;
+            }
+            else
+            {
+                float sum = collision.a->mass + collision.b->mass;
+                a_factor = collision.a->mass / sum;
+                b_factor = collision.b->mass / sum;
+            }
+
+            v2 diff = collision.manifold.b_in_a - collision.manifold.a_in_b;
+            v2 normal = -normalize(diff);
+            float pen_depth = length(diff);
+            pen_depth = max(pen_depth - slop, 0.0f);
+            v2 correction = normal * pen_depth * percent;
+            collision.a->position += correction * a_factor;
+            collision.b->position -= correction * b_factor;
+        }
     }
 }
 

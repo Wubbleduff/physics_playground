@@ -2,7 +2,9 @@
 #pragma once
 
 #include "game_math.h"
+#include "physics.h"
 
+#include <cstdint>
 #include <vector>
 
 
@@ -114,11 +116,9 @@ struct QuadTree
 */
 
 
-struct Body;
-
 struct Level
 {
-    std::vector<Body *> bodies;
+    std::vector<RigidBody> bodies;
     struct QuadTree *quad_tree;
     int mouse_body_index;
 
@@ -128,7 +128,7 @@ struct Level
     void step(float time_step);
     void draw();
 
-    Body *make_body();
-    void destroy_body(Body *body);
+    uint32_t make_body();
+    //void destroy_body(Body *body);
 };
 
