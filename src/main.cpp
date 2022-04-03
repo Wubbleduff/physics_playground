@@ -7,15 +7,48 @@
 #include "game_math.h"
 
 #include "level.h"
+#include "levels/dynamics.h"
 
 #include <windows.h>
 #include <GLFW/glfw3.h>
 
 using namespace GameMath;
 
+struct LevelState
+{
+    Level *level;
+
+    bool do_swap;
+    LevelID next_level;
+};
+
+static LevelState level_state = {};
+
+
 float get_time()
 {
     return glfwGetTime();
+}
+
+void set_next_level(LevelID next_level_id)
+{
+    level_state.next_level = next_level_id;
+    level_state.do_swap = true;
+}
+
+static void switch_level()
+{
+    delete level_state.level;
+
+    switch(level_state.next_level)
+    {
+        case DYNAMICS:
+            level_state.level = new LevelDynamics();
+            level_state.level->init();
+            break;
+    }
+
+    level_state.do_swap = false;
 }
 
 INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nCmdShow)
@@ -26,8 +59,7 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
         return 1;
     }
 
-    Level *level = new Level();
-    level->init();
+    set_next_level(DYNAMICS);
 
     // Main loop
     float timer = 0.0f;
@@ -43,8 +75,12 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
         {
             timer -= STEP_TIME;
 
-            level->step(STEP_TIME);
-            level->draw();
+            if(level_state.do_swap)
+            {
+                switch_level();
+            }
+
+            level_state.level->step(STEP_TIME);
 
             Graphics::clear_frame(v4(0.0f, 0.0f, 0.05f, 1.0f));
             Graphics::render();
@@ -52,7 +88,6 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
         }
     }
 
-    level->uninit();
     Graphics::uninit();
 
     return 0;

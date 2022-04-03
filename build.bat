@@ -5,7 +5,7 @@ set DEBUG_RUN_TREE=.\run_trees\debug
 set EXE=engine.exe
 set PDB=engine.pdb
 
-set SOURCE=src\*.cpp lib/glad/src/glad.c
+set SOURCE=src\*.cpp src\levels\*.cpp lib\glad\src\glad.c
 set INCLUDE_DIRS=/I"src" /I"lib\glad\include" /I"lib\glfw\include" /I"lib\imgui" /I"lib\stb"
 set LIBS=user32.lib gdi32.lib shell32.lib opengl32.lib lib\glfw\glfw.lib
 
