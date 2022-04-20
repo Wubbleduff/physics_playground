@@ -4,6 +4,7 @@
 enum LevelID
 {
     DYNAMICS,
+    COLLISION_DETECTION,
 };
 
 struct Level

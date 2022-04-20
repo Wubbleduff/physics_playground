@@ -19,14 +19,18 @@ struct RigidBody
     float mass = 1.0f; // kg
     float moment_of_inertia = 0.0f; // kg * m^2 To be derived
 
-    void apply_force(GameMath::v2 force)
-    {
-        acceleration_sum += force / mass;
-    }
-
     void apply_torque(float torque)
     {
         angular_acceleration_sum += torque / moment_of_inertia;
+    }
+
+    void apply_force(GameMath::v2 force, GameMath::v2 point_of_application)
+    {
+        acceleration_sum += force / mass;
+        
+        GameMath::v2 center_of_mass = GameMath::v2();
+        GameMath::v2 perp = GameMath::find_ccw_normal(point_of_application - center_of_mass);
+        apply_torque(GameMath::dot(perp, force));
     }
 };
 

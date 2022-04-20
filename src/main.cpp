@@ -8,6 +8,7 @@
 
 #include "level.h"
 #include "levels/dynamics.h"
+#include "levels/collision_detection.h"
 
 #include <windows.h>
 #include <GLFW/glfw3.h>
@@ -46,6 +47,10 @@ static void switch_level()
             level_state.level = new LevelDynamics();
             level_state.level->init();
             break;
+        case COLLISION_DETECTION:
+            level_state.level = new LevelCollisionDetection();
+            level_state.level->init();
+            break;
     }
 
     level_state.do_swap = false;
@@ -59,7 +64,7 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
         return 1;
     }
 
-    set_next_level(DYNAMICS);
+    set_next_level(COLLISION_DETECTION);
 
     // Main loop
     float timer = 0.0f;

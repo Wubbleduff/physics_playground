@@ -13,15 +13,13 @@ void LevelDynamics::init()
     body->mass = 1.0f;
     body->moment_of_inertia = body->mass; // TODO Derive moment of inertia.
 
-
-    body->apply_force(v2(500.0f, 0.0f));
-    body->apply_torque(500.0f);
+    body->apply_force(v2(500.0f, 0.0f), v2(0.0f, 1.0f));
 }
 
 void LevelDynamics::step(float time_step)
 {
     v2 drag_force = 0.5f * -body->velocity * air_drag;
-    body->apply_force(drag_force);
+    body->apply_force(drag_force, v2());
 
     body->velocity += body->acceleration_sum * time_step;
     body->position += body->velocity * time_step;
