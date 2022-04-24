@@ -7,6 +7,17 @@
 using namespace GameMath;
 
 
+
+static float EPSILON = 0.0001f;
+static bool EQ(float a, float b)
+{
+    return (GameMath::abs(a - b) < EPSILON);
+}
+static bool EQ(v2 a, v2 b)
+{
+    return (GameMath::abs(a.x - b.x) < EPSILON) && (GameMath::abs(a.y - b.y) < EPSILON);
+}
+
 bool box_box(Box *a, Box *b, Collision *collision)
 {
     v2 a_vertices[] =
@@ -125,41 +136,101 @@ bool box_box(Box *a, Box *b, Collision *collision)
     return true;
 }
 
-bool box_circle(Box *a, Circle *b, Collision *collision)
+bool box_circle(Box *box, Circle *circle, Collision *collision)
 {
-    return false;
-}
+    // Rotate the system so it's AABB vs circle collision where the box is at the origin.
+    v2 box_center = v2();
+    v2 circle_center = circle->center;
+    circle_center -= box->center;
+    circle_center = rotate_vector(circle_center, -box->rotation);
 
-bool box_plane(Box *a, Plane *b, Collision *collision)
-{
+    //v2 box_center = box->center;
+    //v2 circle_center = circle->center;
+
+    v2 b_min = box_center - box->half_extents;
+    v2 b_max = box_center + box->half_extents;
+
+    v2 clamped = v2(
+            clamp(circle_center.x, b_min.x, b_max.x),
+            clamp(circle_center.y, b_min.y, b_max.y));
+
+    if(length(circle_center - clamped) < circle->radius)
+    {
+        // Collision
+        if(EQ(circle_center, clamped))
+        {
+            // Center in box
+            v2 c_min = circle_center - v2(circle->radius, circle->radius);
+            v2 c_max = circle_center + v2(circle->radius, circle->radius);
+
+            float left_diff = c_max.x - b_min.x;
+            float right_diff = b_max.x - c_min.x;
+            float bottom_diff = c_max.y - b_min.y;
+            float top_diff = b_max.y - c_min.y;
+            float min_diff = min(left_diff, min(right_diff, min(bottom_diff, top_diff)));
+
+            v2 normal;
+            if(min_diff == left_diff) normal = v2(-1.0f, 0.0f);
+            else if(min_diff == right_diff) normal = v2(1.0f, 0.0f);
+            else if(min_diff == top_diff) normal = v2(0.0f, 1.0f);
+            else if(min_diff == bottom_diff) normal = v2(0.0f, -1.0f);
+
+            collision->a_in_b = circle_center + normal * (min_diff - circle->radius);
+            collision->b_in_a = circle_center - normal * circle->radius;
+
+            // Un-rotate system
+            collision->a_in_b = rotate_vector(collision->a_in_b, box->rotation);
+            collision->b_in_a = rotate_vector(collision->b_in_a, box->rotation);
+            collision->a_in_b += box->center;
+            collision->b_in_a += box->center;
+            return true;
+        }
+        else
+        {
+            // Center outside of box
+            collision->a_in_b = clamped;
+            collision->b_in_a = circle_center + normalize(clamped - circle_center) * circle->radius;
+
+            collision->a_in_b = rotate_vector(collision->a_in_b, box->rotation);
+            collision->b_in_a = rotate_vector(collision->b_in_a, box->rotation);
+            collision->a_in_b += box->center;
+            collision->b_in_a += box->center;
+            return true;
+        }
+    }
+    
     return false;
 }
 
 bool circle_circle(Circle *a, Circle *b, Collision *collision)
 {
-    return false;
+    v2 diff = b->center - a->center;
+    float l = length(diff);
+    if(l > a->radius + b->radius)
+    {
+        return false;
+    }
+    else if(EQ(a->center, b->center))
+    {
+        collision->a_in_b = a->center;
+        collision->b_in_a = a->center;
+        return true;
+    }
+    else
+    {
+        v2 ndiff = normalize(diff);
+        collision->a_in_b = a->center + ndiff * a->radius;
+        collision->b_in_a = b->center - ndiff * b->radius;
+        return true;
+    }
 }
 
-bool circle_plane(Circle *a, Plane *b, Collision *collision)
-{
-    return false;
-}
 
 
 
 
 
 
-
-
-static void draw_line(v2 a, v2 b, float thickness, int layer = 9)
-{
-    float l = length(b - a);
-    float t = 0.01f;
-    float angle = angle_between(v2(1.0f, 0.0f), b - a);
-    if(dot(v2(0.0f, 1.0f), b - a) < 0.0f) angle = -angle;
-    Graphics::quad((a + b) / 2.0f, v2(l * 0.5f, t), angle, v4(1.0f, 0.0f, 0.5f, 1.0f), layer);
-}
 
 void LevelCollisionDetection::init()
 {
@@ -178,19 +249,19 @@ void LevelCollisionDetection::step(float time_step)
     {
         static float r = 0.0f;
         r += 0.1f * time_step;
-        Box b1 = Box{v2(), v2(0.5f, 0.5f), r};
-        Box b2 = Box{v2(), v2(0.5f, 0.5f), 0.0f};
+        Box b1{v2(), v2(0.5f, 0.5f), r};
+        Box b2{v2(), v2(1.5f, 1.5f), 0.0f};
         b1.center = mouse_pos;
 
-        v4 color = v4(0.2f, 0.0f, 0.8f, 1);
+        v4 color = Color::BLUE;
 
         Collision c = {};
         bool colliding = box_box(&b1, &b2, &c);
         if(colliding)
         {
-            color = v4(0.7f, 0.7f, 0.1f, 1.0f);
+            color = Color::YELLOW;
 
-            Graphics::arrow(c.a_in_b, c.b_in_a, 0.01f, v4(0.2f, 0.0f, 0.8f, 1.0f));
+            Graphics::arrow(c.a_in_b, c.b_in_a, 0.01f, Color::BLUE);
 
 //            v2 c_normal = c.b_in_a - c.a_in_b;
 //            b1.center += c_normal / 2.0f;
@@ -200,6 +271,57 @@ void LevelCollisionDetection::step(float time_step)
         Graphics::quad(b1.center, b1.half_extents, b1.rotation, color);
         Graphics::quad(b2.center, b2.half_extents, b2.rotation, color);
     }
+
+    // Box circle
+    if(scenario == 1)
+    {
+        static float r = 0.0f;
+        r += 0.1f * time_step;
+        Box b1{mouse_pos, v2(0.5f, 0.5f), r};
+        Circle c1{v2(), 0.5f};
+
+        v4 color = Color::BLUE;
+
+        Collision c = {};
+        bool colliding = box_circle(&b1, &c1, &c);
+        if(colliding)
+        {
+            color = Color::YELLOW;
+            Graphics::arrow(c.a_in_b, c.b_in_a, 0.01f, Color::BLUE);
+
+//            v2 c_normal = c.b_in_a - c.a_in_b;
+//            b1.center += c_normal / 2.0f;
+//            c1.center -= c_normal / 2.0f;
+        }
+
+        Graphics::quad(b1.center, b1.half_extents, b1.rotation, color);
+        Graphics::circle(c1.center, c1.radius, color);
+    }
+
+    // Circle circle
+    if(scenario == 2)
+    {
+        v4 color = Color::BLUE;
+
+        Circle c1{mouse_pos, 0.5f};
+        Circle c2{v2(), 0.5f};
+
+        Collision c = {};
+        bool colliding = circle_circle(&c1, &c2, &c);
+        if(colliding)
+        {
+            color = Color::YELLOW;
+            Graphics::arrow(c.a_in_b, c.b_in_a, 0.01f, Color::BLUE);
+
+//            v2 c_normal = c.b_in_a - c.a_in_b;
+//            c1.center += c_normal / 2.0f;
+//            c2.center -= c_normal / 2.0f;
+        }
+
+        Graphics::circle(c1.center, c1.radius, color);
+        Graphics::circle(c2.center, c2.radius, color);
+    }
+
 }
 
 
