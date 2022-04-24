@@ -26,9 +26,8 @@ struct Plane
 
 struct Collision
 {
-    v2 a_contact;
-    v2 b_contact;
-    GameMath::v2 normal;
+    GameMath::v2 a_in_b;
+    GameMath::v2 b_in_a;
 };
 
 bool box_box(Box *a, Box *b, Collision *collision);
