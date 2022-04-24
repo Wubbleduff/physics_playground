@@ -626,6 +626,16 @@ void Graphics::line(v2 a, v2 b, float half_width, v4 color, int layer)
     group->pack_line(&data);
 }
 
+void Graphics::arrow(v2 start, v2 end, float half_width, v4 color, int layer)
+{
+    Graphics::line(start, end, half_width, color, layer);
+    float max_leg_len = 0.1f;
+    float leg_len = min(0.4f * length(end - start), max_leg_len);
+    v2 leg = -normalize(end - start) * leg_len;
+    Graphics::line(end, end + rotate_vector(leg, PI / 8.0f), half_width, color, layer);
+    Graphics::line(end, end + rotate_vector(leg, -PI / 8.0f), half_width, color, layer);
+}
+
 
 
 

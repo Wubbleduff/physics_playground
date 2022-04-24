@@ -182,17 +182,15 @@ void LevelCollisionDetection::step(float time_step)
         Box b2 = Box{v2(), v2(0.5f, 0.5f), 0.0f};
         b1.center = mouse_pos;
 
-        v4 color = v4(1, 1, 1, 1);
+        v4 color = v4(0.2f, 0.0f, 0.8f, 1);
 
         Collision c = {};
         bool colliding = box_box(&b1, &b2, &c);
         if(colliding)
         {
-            color = v4(0.0f, 1.0f, 0.0f, 1.0f);
+            color = v4(0.7f, 0.7f, 0.1f, 1.0f);
 
-            Graphics::quad(c.a_in_b, v2(0.01f, 0.01f), 0.0f, v4(0.0f, 0.0f, 1.0f, 1.0f), 10);
-            Graphics::quad(c.b_in_a, v2(0.01f, 0.01f), 0.0f, v4(0.0f, 0.0f, 1.0f, 1.0f), 10);
-            draw_line(c.a_in_b, c.b_in_a, 0.01f);
+            Graphics::arrow(c.a_in_b, c.b_in_a, 0.01f, v4(0.2f, 0.0f, 0.8f, 1.0f));
 
 //            v2 c_normal = c.b_in_a - c.a_in_b;
 //            b1.center += c_normal / 2.0f;
