@@ -1,5 +1,5 @@
 
-#include "collision_resolution.h"
+#include "collision_detection/collision_detection.h"
 #include "graphics.h"
 #include <math.h>
 
@@ -7,9 +7,6 @@
 using namespace GameMath;
 
 
-
-namespace CollisionResolution
-{
 
 static float EPSILON = 0.0001f;
 static bool EQ(float a, float b)
@@ -235,151 +232,96 @@ bool circle_circle(Circle *a, Circle *b, Collision *collision)
 
 
 
-static void update_body(RigidBodyBox *body, float time_step)
+void LevelCollisionDetection::init()
 {
-    static const float air_drag = 3.0f;
-    static const float rotational_air_drag = 1.0f;
+    Graphics::Camera::width() = 8.0f;
 
-    v2 drag_force = 0.5f * -body->velocity * air_drag;
-    body->apply_force(drag_force, v2());
-
-    body->velocity += body->acceleration_sum * time_step;
-    body->shape.center += body->velocity * time_step;
-
-    float angular_drag_force = -body->angular_velocity * rotational_air_drag;
-    body->apply_torque(angular_drag_force);
-
-    body->angular_velocity += body->angular_acceleration_sum * time_step;
-    body->shape.rotation += body->angular_velocity * time_step;
-
-    body->acceleration_sum = v2();
-    body->angular_acceleration_sum = 0.0;
 }
 
-static void update_body(RigidBodyCircle *body, float time_step)
+void LevelCollisionDetection::step(float time_step)
 {
-    static const float air_drag = 3.0f;
+    v2 mouse_pos = Graphics::mouse_world_position();
 
-    v2 drag_force = 0.5f * -body->velocity * air_drag;
-    body->apply_force(drag_force, v2());
+    int scenario = 1;
 
-    body->velocity += body->acceleration_sum * time_step;
-    body->shape.center += body->velocity * time_step;
-
-    float angular_drag_force = -body->angular_velocity * air_drag;
-    body->apply_torque(angular_drag_force);
-
-    body->angular_velocity += body->angular_acceleration_sum * time_step;
-    body->shape.rotation += body->angular_velocity * time_step;
-
-    body->acceleration_sum = v2();
-    body->angular_acceleration_sum = 0.0;
-}
-
-void LevelCollisionResolution::init()
-{
-    Graphics::Camera::width() = 16.0f;
-
-    b1.mass = 1.0f;
-    b1.moment_of_inertia = 1.0f;
-    b2.mass = 1.0f;
-    b2.moment_of_inertia = 1.0f;
-
-    b1.shape.half_extents = v2(0.5f, 0.5f);
-    b2.shape.radius = 0.5f;
-
-    v2 initial_vel = v2(15.0f, 0.0f);
-
-    b1.shape.center = v2(-5.0f, 0.25f);
-    b1.velocity = initial_vel;
-
-    b2.shape.center = v2( 5.0f, -0.25f);
-    b2.velocity = -initial_vel;
-}
-
-void LevelCollisionResolution::step(float time_step)
-{
-    update_body(&b1, time_step);
-    update_body(&b2, time_step);
-
-    Collision c;
-    bool collided = box_circle(&b1.shape, &b2.shape, &c);
-    if(collided)
+    // Box box
+    if(scenario == 0)
     {
-        //
-        // Collision resolution is based on the following contraints:
-        // * We can simplify a tiny window of large forces into an impulse (just an instant change in velocity).
-        //   We need to figure out how much of a change in velocity we need to apply.
-        // * With a frictionless collision, we only apply an impulse in the axis of the collision normal. This
-        //   simplifies the collision into a 1 dimensional resolution problem: we can look at the relative
-        //   velocities along the collision normal.
-        // * Newton's law of restituion: relative_velocity_after = e * -relative_velocity_before
-        // * Applying the impluse: velocity_after = velocity_before + impulse   ->
-        //                         velocity_after = velocity_before + (j / M)*n
-        // 
-        // Combining these equations, we can figure out what impulse to apply:
-        // impulse = direction of the collision * impulse magnitude
-        // We know the direction of the impulse: the collision normal. The magnitude of the impulse is (j / M).
-        // In otherwords, we need to find j.
-        // Using the equations above:
-        // * relative_velocity_after*n = e * -relative_velocity_before*n ->
-        //   (va_after - vb_after)*n = e * -(va_before - vb_before)*n
-        // and
-        // * va_after = va_before + (j / M_a)*n
-        //   vb_after = vb_before - (j / M_b)*n
-        // algebra.exe
-        // j = -(1 + e)*(va_before - vb_before) * n
-        //     ------------------------------------
-        //            n * n*(1/M_a + 1/M_b)        
-        // 
-        // Plug j back into equations for applying impulse and collision is resolved.
-        //
-        // For rotations, we follow a similar set of constarints:
-        // * wa_after = wa_before + (r_ap * j*n) / Ia
-        // * wb_after = wb_before - (r_bp * j*n) / Ib
-        // w is rotational velocity.
-        // rp_ab is perp-dot-product of the point of application that same as in dynamics.
-        // I is moment of inertia.
-        //
-        // j =           -(1 + e)*(va_before - vb_before) * n
-        //     --------------------------------------------------------
-        //     n * n*(1/M_a + 1/M_b) + (r_ap * n)^2/Ia + (r_bp * n)^2/Ia
-        //
+        static float r = 0.0f;
+        r += 0.1f * time_step;
+        Box b1{v2(), v2(0.5f, 0.5f), r};
+        Box b2{v2(), v2(1.5f, 1.5f), 0.0f};
+        b1.center = mouse_pos;
 
-        // Check if we're moving towards each other. Otherwise, we're moving out and we shouldn't change velocities anyways.
-        if(dot(b2.shape.center - b1.shape.center, b1.velocity) > 0.0f)
+        v4 color = Color::BLUE;
+
+        Collision c = {};
+        bool colliding = box_box(&b1, &b2, &c);
+        if(colliding)
         {
-            static const float e = 0.75f;
-            v2 n = c.a_in_b - c.b_in_a;
-            v2 relative_velocity = b1.velocity - b2.velocity;
+            color = Color::YELLOW;
 
-            {
-                float j = (-(1.0f + e) * dot(relative_velocity, n)) /
-                          (dot(n, n * (1.0f / b1.mass + 1.0f / b2.mass)));
+            Graphics::arrow(c.a_in_b, c.b_in_a, 0.01f, Color::BLUE);
 
-                b1.velocity = b1.velocity + (j / b1.mass) * n;
-                b2.velocity = b2.velocity - (j / b2.mass) * n;
-            }
-
-            {
-                v2 r_ap = find_ccw_normal(c.a_in_b - b1.shape.center);
-                v2 r_bp = find_ccw_normal(c.b_in_a - b2.shape.center);
-                float j = (-(1.0f + e) * dot(relative_velocity, n)) /
-                          (dot(n, n * (1.0f / b1.mass + 1.0f / b2.mass)) + (squared(dot(r_ap, n)) / b1.moment_of_inertia) + (squared(dot(r_bp, n)) / b2.moment_of_inertia));
-
-                b1.angular_velocity = b1.angular_velocity + dot(r_ap, j * n) / b1.moment_of_inertia;
-                b2.angular_velocity = b2.angular_velocity - dot(r_bp, j * n) / b2.moment_of_inertia;
-            }
-
+//            v2 c_normal = c.b_in_a - c.a_in_b;
+//            b1.center += c_normal / 2.0f;
+//            b2.center -= c_normal / 2.0f;
         }
+
+        Graphics::quad(b1.center, b1.half_extents, b1.rotation, color);
+        Graphics::quad(b2.center, b2.half_extents, b2.rotation, color);
     }
 
-    Graphics::quad(b1.shape.center, b1.shape.half_extents, b1.shape.rotation, Color::BLUE);
-    Graphics::arrow(b1.shape.center, b1.shape.center + rotate_vector(b1.shape.half_extents, b1.shape.rotation), 0.02f, v4(Color::RED));
+    // Box circle
+    if(scenario == 1)
+    {
+        static float r = 0.0f;
+        r += 0.1f * time_step;
+        Box b1{mouse_pos, v2(0.5f, 0.5f), r};
+        Circle c1{v2(), 0.5f};
 
-    Graphics::circle(b2.shape.center, b2.shape.radius, Color::YELLOW);
-    Graphics::arrow(b2.shape.center, b2.shape.center + rotate_vector(v2(1.0f, 0.0f) * b2.shape.radius, b2.shape.rotation), 0.02f, v4(Color::RED));
+        v4 color = Color::BLUE;
+
+        Collision c = {};
+        bool colliding = box_circle(&b1, &c1, &c);
+        if(colliding)
+        {
+            color = Color::YELLOW;
+            Graphics::arrow(c.a_in_b, c.b_in_a, 0.01f, Color::BLUE);
+
+//            v2 c_normal = c.b_in_a - c.a_in_b;
+//            b1.center += c_normal / 2.0f;
+//            c1.center -= c_normal / 2.0f;
+        }
+
+        Graphics::quad(b1.center, b1.half_extents, b1.rotation, color);
+        Graphics::circle(c1.center, c1.radius, color);
+    }
+
+    // Circle circle
+    if(scenario == 2)
+    {
+        v4 color = Color::BLUE;
+
+        Circle c1{mouse_pos, 0.5f};
+        Circle c2{v2(), 0.5f};
+
+        Collision c = {};
+        bool colliding = circle_circle(&c1, &c2, &c);
+        if(colliding)
+        {
+            color = Color::YELLOW;
+            Graphics::arrow(c.a_in_b, c.b_in_a, 0.01f, Color::BLUE);
+
+//            v2 c_normal = c.b_in_a - c.a_in_b;
+//            c1.center += c_normal / 2.0f;
+//            c2.center -= c_normal / 2.0f;
+        }
+
+        Graphics::circle(c1.center, c1.radius, color);
+        Graphics::circle(c2.center, c2.radius, color);
+    }
 
 }
 
-}
+

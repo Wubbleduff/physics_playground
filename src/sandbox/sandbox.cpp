@@ -1,5 +1,5 @@
 
-#include "collision_detection.h"
+#include "sandbox/sandbox.h"
 #include "graphics.h"
 #include <math.h>
 
@@ -7,6 +7,9 @@
 using namespace GameMath;
 
 
+
+namespace Sandbox
+{
 
 static float EPSILON = 0.0001f;
 static bool EQ(float a, float b)
@@ -109,7 +112,7 @@ bool box_box(Box *a, Box *b, Collision *collision)
             }
 
             // Check if this separation is the best (minimum) separation so far.
-            float j_pen_depth = abs(signed_distance_to_plane(j_vertices[max_pen_index], i_vertices[i], i_normal));
+            float j_pen_depth = GameMath::abs(signed_distance_to_plane(j_vertices[max_pen_index], i_vertices[i], i_normal));
             if(initial_check || (j_pen_depth < length(min_separating_normal)))
             {
                 min_separating_normal = normalize(i_normal) * j_pen_depth;
@@ -232,96 +235,183 @@ bool circle_circle(Circle *a, Circle *b, Collision *collision)
 
 
 
-void LevelCollisionDetection::init()
+static void update_body(Kinematics *kinematics, v2 *position, float *rotation, float time_step)
 {
-    Graphics::Camera::width() = 8.0f;
+    static const float air_drag = 3.0f;
+    static const float rotational_air_drag = 1.0f;
+
+    v2 drag_force = 0.5f * -kinematics->velocity * air_drag;
+    kinematics->apply_force(drag_force, v2());
+
+    kinematics->velocity += kinematics->acceleration_sum * time_step;
+    *position += kinematics->velocity * time_step;
+
+    float angular_drag_force = -kinematics->angular_velocity * rotational_air_drag;
+    kinematics->apply_torque(angular_drag_force);
+
+    kinematics->angular_velocity += kinematics->angular_acceleration_sum * time_step;
+    *rotation += kinematics->angular_velocity * time_step;
+
+    kinematics->acceleration_sum = v2();
+    kinematics->angular_acceleration_sum = 0.0;
+}
+
+void LevelSandbox::init()
+{
+    Graphics::Camera::width() = 16.0f;
+
+    make_body_box(
+        Kinematics {
+            v2(10.0f, 0.0f),
+            0.0f,
+            v2(),
+            0.0f,
+            1.0f,
+            1.0f,
+        },
+        Box {
+            v2(-5.0f, 0.0f),
+            v2(0.5f, 0.5f),
+            0.0f
+        }
+    );
+
+    make_body_circle(
+        Kinematics {
+            v2(-10.0f, 0.0f),
+            0.0f,
+            v2(),
+            0.0f,
+            1.0f,
+            1.0f,
+        },
+        Circle {
+            v2(5.0f, 0.0f),
+            0.5f,
+            0.0f
+        }
+    );
+}
+
+void LevelSandbox::step(float time_step)
+{
+    for(int i = 0; i < box_list.kinematics.size(); i++)
+    {
+        Kinematics &kinematics = box_list.kinematics[i];
+        Box &geometry = box_list.geometry[i];
+        update_body(&kinematics, &geometry.center, &geometry.rotation, time_step);
+    }
+    for(int i = 0; i < circle_list.kinematics.size(); i++)
+    {
+        Kinematics &kinematics = circle_list.kinematics[i];
+        Circle &geometry = circle_list.geometry[i];
+        update_body(&kinematics, &geometry.center, &geometry.rotation, time_step);
+    }
+
+    for(int i = 0; i < box_list.geometry.size(); i++)
+    {
+        Box &geometry = box_list.geometry[i];
+        Graphics::quad(geometry.center, geometry.half_extents, geometry.rotation, Color::BLUE);
+        Graphics::arrow(geometry.center, geometry.center + rotate_vector(geometry.half_extents, geometry.rotation), 0.02f, v4(Color::RED));
+    }
+    for(int i = 0; i < circle_list.geometry.size(); i++)
+    {
+        Circle &geometry = circle_list.geometry[i];
+        Graphics::circle(geometry.center, geometry.radius, Color::YELLOW);
+        Graphics::arrow(geometry.center, geometry.center + rotate_vector(v2(1.0f, 0.0f) * geometry.radius, geometry.rotation), 0.02f, v4(Color::RED));
+    }
+
+
+
+#if 0
+    Collision c;
+    bool collided = box_circle(&b1.shape, &b2.shape, &c);
+    if(collided)
+    {
+        //
+        // Collision resolution is based on the following contraints:
+        // * We can simplify a tiny window of large forces into an impulse (just an instant change in velocity).
+        //   We need to figure out how much of a change in velocity we need to apply.
+        // * With a frictionless collision, we only apply an impulse in the axis of the collision normal. This
+        //   simplifies the collision into a 1 dimensional resolution problem: we can look at the relative
+        //   velocities along the collision normal.
+        // * Newton's law of restituion: relative_velocity_after = e * -relative_velocity_before
+        // * Applying the impluse: velocity_after = velocity_before + impulse   ->
+        //                         velocity_after = velocity_before + (j / M)*n
+        // 
+        // Combining these equations, we can figure out what impulse to apply:
+        // impulse = direction of the collision * impulse magnitude
+        // We know the direction of the impulse: the collision normal. The magnitude of the impulse is (j / M).
+        // In otherwords, we need to find j.
+        // Using the equations above:
+        // * relative_velocity_after*n = e * -relative_velocity_before*n ->
+        //   (va_after - vb_after)*n = e * -(va_before - vb_before)*n
+        // and
+        // * va_after = va_before + (j / M_a)*n
+        //   vb_after = vb_before - (j / M_b)*n
+        // algebra.exe
+        // j = -(1 + e)*(va_before - vb_before) * n
+        //     ------------------------------------
+        //            n * n*(1/M_a + 1/M_b)        
+        // 
+        // Plug j back into equations for applying impulse and collision is resolved.
+        //
+        // For rotations, we follow a similar set of constarints:
+        // * wa_after = wa_before + (r_ap * j*n) / Ia
+        // * wb_after = wb_before - (r_bp * j*n) / Ib
+        // w is rotational velocity.
+        // rp_ab is perp-dot-product of the point of application that same as in dynamics.
+        // I is moment of inertia.
+        //
+        // j =           -(1 + e)*(va_before - vb_before) * n
+        //     --------------------------------------------------------
+        //     n * n*(1/M_a + 1/M_b) + (r_ap * n)^2/Ia + (r_bp * n)^2/Ia
+        //
+
+        // Check if we're moving towards each other. Otherwise, we're moving out and we shouldn't change velocities anyways.
+        if(dot(b2.shape.center - b1.shape.center, b1.velocity) > 0.0f)
+        {
+            static const float e = 0.75f;
+            v2 n = c.a_in_b - c.b_in_a;
+            v2 relative_velocity = b1.velocity - b2.velocity;
+
+            {
+                float j = (-(1.0f + e) * dot(relative_velocity, n)) /
+                          (dot(n, n * (1.0f / b1.mass + 1.0f / b2.mass)));
+
+                b1.velocity = b1.velocity + (j / b1.mass) * n;
+                b2.velocity = b2.velocity - (j / b2.mass) * n;
+            }
+
+            {
+                v2 r_ap = find_ccw_normal(c.a_in_b - b1.shape.center);
+                v2 r_bp = find_ccw_normal(c.b_in_a - b2.shape.center);
+                float j = (-(1.0f + e) * dot(relative_velocity, n)) /
+                          (dot(n, n * (1.0f / b1.mass + 1.0f / b2.mass)) + (squared(dot(r_ap, n)) / b1.moment_of_inertia) + (squared(dot(r_bp, n)) / b2.moment_of_inertia));
+
+                b1.angular_velocity = b1.angular_velocity + dot(r_ap, j * n) / b1.moment_of_inertia;
+                b2.angular_velocity = b2.angular_velocity - dot(r_bp, j * n) / b2.moment_of_inertia;
+            }
+
+        }
+    }
+#endif
+
 
 }
 
-void LevelCollisionDetection::step(float time_step)
+
+void LevelSandbox::make_body_box(const Kinematics &kinematics, const Box &shape)
 {
-    v2 mouse_pos = Graphics::mouse_world_position();
+    box_list.kinematics.emplace_back(kinematics);
+    box_list.geometry.emplace_back(shape);
+}
 
-    int scenario = 1;
-
-    // Box box
-    if(scenario == 0)
-    {
-        static float r = 0.0f;
-        r += 0.1f * time_step;
-        Box b1{v2(), v2(0.5f, 0.5f), r};
-        Box b2{v2(), v2(1.5f, 1.5f), 0.0f};
-        b1.center = mouse_pos;
-
-        v4 color = Color::BLUE;
-
-        Collision c = {};
-        bool colliding = box_box(&b1, &b2, &c);
-        if(colliding)
-        {
-            color = Color::YELLOW;
-
-            Graphics::arrow(c.a_in_b, c.b_in_a, 0.01f, Color::BLUE);
-
-//            v2 c_normal = c.b_in_a - c.a_in_b;
-//            b1.center += c_normal / 2.0f;
-//            b2.center -= c_normal / 2.0f;
-        }
-
-        Graphics::quad(b1.center, b1.half_extents, b1.rotation, color);
-        Graphics::quad(b2.center, b2.half_extents, b2.rotation, color);
-    }
-
-    // Box circle
-    if(scenario == 1)
-    {
-        static float r = 0.0f;
-        r += 0.1f * time_step;
-        Box b1{mouse_pos, v2(0.5f, 0.5f), r};
-        Circle c1{v2(), 0.5f};
-
-        v4 color = Color::BLUE;
-
-        Collision c = {};
-        bool colliding = box_circle(&b1, &c1, &c);
-        if(colliding)
-        {
-            color = Color::YELLOW;
-            Graphics::arrow(c.a_in_b, c.b_in_a, 0.01f, Color::BLUE);
-
-//            v2 c_normal = c.b_in_a - c.a_in_b;
-//            b1.center += c_normal / 2.0f;
-//            c1.center -= c_normal / 2.0f;
-        }
-
-        Graphics::quad(b1.center, b1.half_extents, b1.rotation, color);
-        Graphics::circle(c1.center, c1.radius, color);
-    }
-
-    // Circle circle
-    if(scenario == 2)
-    {
-        v4 color = Color::BLUE;
-
-        Circle c1{mouse_pos, 0.5f};
-        Circle c2{v2(), 0.5f};
-
-        Collision c = {};
-        bool colliding = circle_circle(&c1, &c2, &c);
-        if(colliding)
-        {
-            color = Color::YELLOW;
-            Graphics::arrow(c.a_in_b, c.b_in_a, 0.01f, Color::BLUE);
-
-//            v2 c_normal = c.b_in_a - c.a_in_b;
-//            c1.center += c_normal / 2.0f;
-//            c2.center -= c_normal / 2.0f;
-        }
-
-        Graphics::circle(c1.center, c1.radius, color);
-        Graphics::circle(c2.center, c2.radius, color);
-    }
-
+void LevelSandbox::make_body_circle(const Kinematics &kinematics, const Circle &shape)
+{
+    circle_list.kinematics.emplace_back(kinematics);
+    circle_list.geometry.emplace_back(shape);
 }
 
 
+}

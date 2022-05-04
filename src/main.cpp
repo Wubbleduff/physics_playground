@@ -6,10 +6,11 @@
 #include "graphics.h"
 #include "game_math.h"
 
-#include "level.h"
-#include "levels/dynamics.h"
-#include "levels/collision_detection.h"
-#include "levels/collision_resolution.h"
+#include "level_base.h"
+#include "dynamics/dynamics.h"
+#include "collision_detection/collision_detection.h"
+#include "collision_resolution/collision_resolution.h"
+#include "sandbox/sandbox.h"
 
 #include <windows.h>
 #include <GLFW/glfw3.h>
@@ -56,6 +57,10 @@ static void switch_level()
             level_state.level = new CollisionResolution::LevelCollisionResolution();
             level_state.level->init();
             break;
+        case SANDBOX:
+            level_state.level = new Sandbox::LevelSandbox();
+            level_state.level->init();
+            break;
     }
 
     level_state.do_swap = false;
@@ -69,7 +74,10 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
         return 1;
     }
 
-    set_next_level(COLLISION_RESOLUTION);
+    //set_next_level(DYNAMICS);
+    //set_next_level(COLLISION_DETECTION);
+    //set_next_level(COLLISION_RESOLUTION);
+    set_next_level(SANDBOX);
 
     // Main loop
     float timer = 0.0f;

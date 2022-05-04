@@ -1,5 +1,5 @@
 
-#include "levels/dynamics.h"
+#include "dynamics/dynamics.h"
 
 #include "graphics.h"
 
