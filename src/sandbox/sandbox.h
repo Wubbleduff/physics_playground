@@ -32,17 +32,19 @@ namespace Sandbox
         GameMath::v2 acceleration_sum = GameMath::v2(0.0f, 0.0f);
         float angular_acceleration_sum = 0.0f;
         
-        float mass = 1.0f; // kg
-        float moment_of_inertia = 1.0f; // kg * m^2 To be derived
+        float inv_mass = 1.0f; // kg
+        float inv_moment_of_inertia = 1.0f; // kg * m^2 To be derived
+        
+        bool is_static = false;
         
         void apply_torque(float torque)
         {
-            angular_acceleration_sum += torque / moment_of_inertia;
+            angular_acceleration_sum += torque * inv_moment_of_inertia;
         }
         
         void apply_force(GameMath::v2 force, GameMath::v2 point_of_application)
         {
-            acceleration_sum += force / mass;
+            acceleration_sum += force * inv_mass;
             
             GameMath::v2 center_of_mass = GameMath::v2();
             GameMath::v2 perp = GameMath::find_ccw_normal(point_of_application - center_of_mass);
@@ -56,8 +58,8 @@ namespace Sandbox
         GameMath::v2 b_in_a;
         Kinematics *a_kinematics;
         Kinematics *b_kinematics;
-        GameMath::v2 a_center_of_mass;
-        GameMath::v2 b_center_of_mass;
+        GameMath::v2 *a_center_of_mass;
+        GameMath::v2 *b_center_of_mass;
     };
     
     bool box_box(Box *a, Box *b, Collision *collision);

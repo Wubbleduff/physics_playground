@@ -2,6 +2,8 @@
 #include "sandbox/sandbox.h"
 #include "graphics.h"
 #include <math.h>
+#include <stdlib.h>
+#include <time.h>
 
 
 using namespace GameMath;
@@ -239,9 +241,12 @@ namespace Sandbox
     {
         static const float air_drag = 3.0f;
         static const float rotational_air_drag = 1.0f;
+        static const float gravity = 9.81f;
         
         v2 drag_force = 0.5f * -kinematics->velocity * air_drag;
         kinematics->apply_force(drag_force, v2());
+        
+        kinematics->apply_force(v2(0.0f, -gravity), v2());
         
         kinematics->velocity += kinematics->acceleration_sum * time_step;
         *position += kinematics->velocity * time_step;
@@ -260,53 +265,72 @@ namespace Sandbox
     {
         Graphics::Camera::width() = 16.0f;
         
+#if 0
         make_body_box(
-                      Kinematics {
-                          v2(10.0f, 0.0f),
-                          0.0f,
-                          v2(),
-                          0.0f,
-                          1.0f,
-                          1.0f,
-                      },
-                      Box {
-                          v2(-5.0f, 0.25f),
-                          v2(0.5f, 0.5f),
-                          0.0f
-                      }
+                      Kinematics { v2(0.0f, 0.0f), 0.0f, v2(), 0.0f, 1.0f, 1.0f, false, },
+                      Box { v2(0.0f, 0.25f), v2(0.5f, 0.5f), 0.0f }
                       );
         
         make_body_circle(
-                         Kinematics {
-                             v2(-10.0f, 0.0f),
-                             0.0f,
-                             v2(),
-                             0.0f,
-                             1.0f,
-                             1.0f,
-                         },
-                         Circle {
-                             v2(5.0f, -0.25f),
-                             0.5f,
-                             0.0f
-                         }
+                         Kinematics { v2(-15.0f, 0.0f), 0.0f, v2(), 0.0f, 1.0f, 1.0f, false, },
+                         Circle { v2(5.0f, -0.25f), 0.5f, 0.0f }
                          );
         
         make_body_circle(
-                         Kinematics {
-                             v2(0.0f, 20.0f),
-                             0.0f,
-                             v2(),
-                             0.0f,
-                             1.0f,
-                             1.0f,
-                         },
-                         Circle {
-                             v2(0.0f, -9.0f),
-                             0.5f,
-                             0.0f
-                         }
+                         Kinematics { v2(0.0f, -30.0f), 0.0f, v2(), 0.0f, 1.0f, 1.0f, false, },
+                         Circle { v2(0.0f, 9.0f), 0.5f, 0.0f }
                          );
+#endif
+        
+        time_t t;
+        seed_random((unsigned)time(&t));
+        for(int i = 0; i < 10; i++)
+        {
+            v2 position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
+            v2 scale = v2(random_range(0.1f, 0.8f), random_range(0.1f, 0.8f));
+            float inv_mass = 1.0f / (scale.x * scale.y);
+            float inv_moment_of_inertia = inv_mass;
+            
+            v2 velocity = v2(random_range(-10.0f, 10.0f), random_range(-10.0f, 10.0f));
+            float angular_velocity = random_range(-10.0f, 10.0f);
+            make_body_box(
+                          Kinematics { velocity, angular_velocity, v2(), 0.0f, inv_mass, inv_moment_of_inertia, false, },
+                          Box { position, scale, 0.0f }
+                          );
+        }
+        
+        for(int i = 0; i < 10; i++)
+        {
+            v2 position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
+            float radius = random_range(0.1f, 0.8f);
+            float inv_mass = 1.0f / (PI * radius*radius);
+            float inv_moment_of_inertia = inv_mass;
+            
+            v2 velocity = v2(random_range(-10.0f, 10.0f), random_range(-10.0f, 10.0f));
+            float angular_velocity = random_range(-10.0f, 10.0f);
+            make_body_circle(
+                             Kinematics { velocity, angular_velocity, v2(), 0.0f, inv_mass, inv_moment_of_inertia, false, },
+                             Circle{ position, radius, 0.0f }
+                             );
+        }
+        
+        
+        make_body_box(
+                      Kinematics { v2(0.0f, 0.0f), 0.0f, v2(), 0.0f, 0.0f, 0.0f, true, },
+                      Box { v2(0.0f, -14.0f), v2(10.0f, 10.0f), 0.0f }
+                      );
+        make_body_box(
+                      Kinematics { v2(0.0f, 0.0f), 0.0f, v2(), 0.0f, 0.0f, 0.0f, true, },
+                      Box { v2(0.0f, 14.0f), v2(10.0f, 10.0f), 0.0f }
+                      );
+        make_body_box(
+                      Kinematics { v2(0.0f, 0.0f), 0.0f, v2(), 0.0f, 0.0f, 0.0f, true, },
+                      Box { v2(-17.0f, 0.0f), v2(10.0f, 10.0f), 0.0f }
+                      );
+        make_body_box(
+                      Kinematics { v2(0.0f, 0.0f), 0.0f, v2(), 0.0f, 0.0f, 0.0f, true, },
+                      Box { v2(17.0f, 0.0f), v2(10.0f, 10.0f), 0.0f }
+                      );
     }
     
     void LevelSandbox::step(float time_step)
@@ -345,14 +369,22 @@ namespace Sandbox
             {
                 Box *box1 = &(box_list.geometry[box1i]);
                 Box *box2 = &(box_list.geometry[box2i]);
+                
+                // TODO
+                // Probably put static objects in their own list.
+                if(box_list.kinematics[box1i].is_static && box_list.kinematics[box2i].is_static)
+                {
+                    continue;
+                }
+                
                 Collision c;
                 bool collided = box_box(box1, box2, &c);
                 if(collided)
                 {
                     c.a_kinematics = &(box_list.kinematics[box1i]);
                     c.b_kinematics = &(box_list.kinematics[box2i]);
-                    c.a_center_of_mass = box_list.geometry[box1i].center;
-                    c.b_center_of_mass = box_list.geometry[box2i].center;
+                    c.a_center_of_mass = &(box_list.geometry[box1i].center);
+                    c.b_center_of_mass = &(box_list.geometry[box2i].center);
                     collisions.push_back(c);
                 }
             }
@@ -370,8 +402,8 @@ namespace Sandbox
                 {
                     c.a_kinematics = &(box_list.kinematics[boxi]);
                     c.b_kinematics = &(circle_list.kinematics[circlei]);
-                    c.a_center_of_mass = box_list.geometry[boxi].center;
-                    c.b_center_of_mass = circle_list.geometry[circlei].center;
+                    c.a_center_of_mass = &(box_list.geometry[boxi].center);
+                    c.b_center_of_mass = &(circle_list.geometry[circlei].center);
                     collisions.push_back(c);
                 }
             }
@@ -389,8 +421,8 @@ namespace Sandbox
                 {
                     c.a_kinematics = &(circle_list.kinematics[circle1i]);
                     c.b_kinematics = &(circle_list.kinematics[circle2i]);
-                    c.a_center_of_mass = circle_list.geometry[circle1i].center;
-                    c.b_center_of_mass = circle_list.geometry[circle2i].center;
+                    c.a_center_of_mass = &(circle_list.geometry[circle1i].center);
+                    c.b_center_of_mass = &(circle_list.geometry[circle2i].center);
                     collisions.push_back(c);
                 }
             }
@@ -439,34 +471,70 @@ namespace Sandbox
             //
             
             Collision &collision = collisions[collisioni];
+            v2 a_in_b = collision.a_in_b;
+            v2 b_in_a = collision.b_in_a;
             
-            // Check if we're moving towards each other. Otherwise, we're moving out and we shouldn't change velocities anyways.
-            if(dot(collision.b_center_of_mass - collision.a_center_of_mass, collision.a_kinematics->velocity) > 0.0f)
+            v2 *a_center_of_mass = collision.a_center_of_mass;
+            v2 a_velocity = collision.a_kinematics->velocity;
+            float a_angular_velocity = collision.a_kinematics->angular_velocity;
+            float a_inv_mass = collision.a_kinematics->inv_mass;
+            float a_inv_moment_of_inertia = collision.a_kinematics->inv_moment_of_inertia;
+            
+            v2 *b_center_of_mass = collision.b_center_of_mass;
+            v2 b_velocity = collision.b_kinematics->velocity;
+            float b_angular_velocity = collision.b_kinematics->angular_velocity;
+            float b_inv_mass = collision.b_kinematics->inv_mass;
+            float b_inv_moment_of_inertia = collision.b_kinematics->inv_moment_of_inertia;
+            
+            // Collision normal.
+            v2 n = a_in_b - b_in_a;
+            
+            // Used for later calculations for determining linear velocity from rotational velocity.
+            v2 r_ap = find_ccw_normal(a_in_b - *a_center_of_mass);
+            v2 r_bp = find_ccw_normal(b_in_a - *b_center_of_mass);
+            
+            // Find velocities of each of the contact points.
+            v2 a_in_b_contact_velocity = a_velocity + r_ap * a_angular_velocity;
+            v2 b_in_a_contact_velocity = b_velocity + r_bp * b_angular_velocity;
+            
+            v2 relative_velocity = a_in_b_contact_velocity - b_in_a_contact_velocity;
+            
+            if(dot(relative_velocity, n) < 0.0f)
             {
-                static const float e = 0.75f;
-                v2 n = collision.a_in_b - collision.b_in_a;
-                v2 relative_velocity = collision.a_kinematics->velocity - collision.b_kinematics->velocity;
-                
-                {
-                    float j = (-(1.0f + e) * dot(relative_velocity, n)) /
-                    (dot(n, n * (1.0f / collision.a_kinematics->mass + 1.0f / collision.b_kinematics->mass)));
-                    
-                    collision.a_kinematics->velocity = collision.a_kinematics->velocity + (j / collision.a_kinematics->mass) * n;
-                    collision.b_kinematics->velocity = collision.b_kinematics->velocity - (j / collision.b_kinematics->mass) * n;
-                }
-                
-                {
-                    v2 r_ap = find_ccw_normal(collision.a_in_b - collision.a_center_of_mass);
-                    v2 r_bp = find_ccw_normal(collision.b_in_a - collision.b_center_of_mass);
-                    
-                    float j = (-(1.0f + e) * dot(relative_velocity, n)) /
-                    (dot(n, n * (1.0f / collision.a_kinematics->mass + 1.0f / collision.b_kinematics->mass)) + (squared(dot(r_ap, n)) / collision.a_kinematics->moment_of_inertia) + (squared(dot(r_bp, n)) / collision.b_kinematics->moment_of_inertia));
-                    
-                    collision.a_kinematics->angular_velocity = collision.a_kinematics->angular_velocity + dot(r_ap, j * n) / collision.a_kinematics->moment_of_inertia;
-                    collision.b_kinematics->angular_velocity = collision.b_kinematics->angular_velocity - dot(r_bp, j * n) / collision.b_kinematics->moment_of_inertia;
-                }
-                
+                // The bodies are leaving each other. No resolution necessary.
+                continue;
             }
+            
+            static const float e = 0.5f;
+            static const float position_correction_scale = 0.75f;
+            
+            // Velocity resolution.
+            {
+                float j = (-(1.0f + e) * dot(relative_velocity, n)) /
+                (dot(n, n * (a_inv_mass + b_inv_mass)));
+                
+                collision.a_kinematics->velocity = a_velocity + (j * a_inv_mass) * n;
+                collision.b_kinematics->velocity = b_velocity - (j * b_inv_mass) * n;
+            }
+            
+            // Angular velocity resolution.
+            {
+                float j = (-(1.0f + e) * dot(relative_velocity, n)) /
+                (dot(n, n * (a_inv_mass + b_inv_mass)) + (squared(dot(r_ap, n)) * a_inv_moment_of_inertia) + (squared(dot(r_bp, n)) * b_inv_moment_of_inertia));
+                
+                collision.a_kinematics->angular_velocity = a_angular_velocity + dot(r_ap, j * n) * a_inv_moment_of_inertia;
+                collision.b_kinematics->angular_velocity = b_angular_velocity - dot(r_bp, j * n) * b_inv_moment_of_inertia;
+            }
+            
+            // Position resolution.
+            // This cheats by pushing objects out of each other modifying position directly. This is needed
+            // so objects don't slowly sink into each other. When velocities of each object are very small,
+            // impulse resolution isn't accurate enough. Positional correction makes of for this at small scales.
+            {
+                *a_center_of_mass -= n * a_inv_mass / (a_inv_mass + b_inv_mass) * position_correction_scale;
+                *b_center_of_mass += n * b_inv_mass / (a_inv_mass + b_inv_mass) * position_correction_scale;
+            }
+            
         }
 #endif
         
