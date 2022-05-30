@@ -147,11 +147,13 @@ namespace Sandbox
         {
             collision->a_in_b = min_contact_points[0];
             collision->b_in_a = min_contact_points[1];
+            collision->normal = -normalize(min_separating_normal);
         }
         else
         {
             collision->b_in_a = min_contact_points[0];
             collision->a_in_b = min_contact_points[1];
+            collision->normal = normalize(min_separating_normal);
         }
         
         return true;
@@ -199,6 +201,7 @@ namespace Sandbox
                 // Un-rotate system
                 collision->a_in_b = rotate_vector(collision->a_in_b, box->rotation);
                 collision->b_in_a = rotate_vector(collision->b_in_a, box->rotation);
+                collision->normal = rotate_vector(normal, box->rotation);
                 collision->a_in_b += box->center;
                 collision->b_in_a += box->center;
                 
@@ -220,6 +223,8 @@ namespace Sandbox
                 collision->b_in_a = rotate_vector(collision->b_in_a, box->rotation);
                 collision->a_in_b += box->center;
                 collision->b_in_a += box->center;
+                
+                collision->normal = normalize(collision->a_in_b - collision->b_in_a);
                 
                 if(EQ(collision->a_in_b, collision->b_in_a))
                 {
@@ -257,6 +262,7 @@ namespace Sandbox
             v2 ndiff = normalize(diff);
             collision->a_in_b = a->center + ndiff * a->radius;
             collision->b_in_a = b->center - ndiff * b->radius;
+            collision->normal = ndiff;
             
             //mfritz
             if(EQ(collision->a_in_b, collision->b_in_a))
@@ -521,7 +527,8 @@ namespace Sandbox
                 
                 // Collision normal.
                 // This is built with the assumption that the collision manifolds are well-formed (the normal won't be length 0).
-                v2 n = a_in_b - b_in_a;
+                //v2 n = a_in_b - b_in_a;
+                v2 n = collision.normal * length(a_in_b - b_in_a);
                 assert(!EQ(n, v2()));
                 
                 // Used for later calculations for determining linear velocity from rotational velocity.
