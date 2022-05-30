@@ -56,6 +56,7 @@ namespace Sandbox
     {
         GameMath::v2 a_in_b;
         GameMath::v2 b_in_a;
+        
         Kinematics *a_kinematics;
         Kinematics *b_kinematics;
         GameMath::v2 *a_center_of_mass;
