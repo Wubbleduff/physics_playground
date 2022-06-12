@@ -10,6 +10,7 @@
 #include "dynamics/dynamics.h"
 #include "collision_detection/collision_detection.h"
 #include "collision_resolution/collision_resolution.h"
+#include "simple_constraints/simple_constraints.h"
 #include "sandbox/sandbox.h"
 
 #include <windows.h>
@@ -20,7 +21,7 @@ using namespace GameMath;
 struct LevelState
 {
     Level *level;
-
+    
     bool do_swap;
     LevelID next_level;
 };
@@ -42,27 +43,31 @@ void set_next_level(LevelID next_level_id)
 static void switch_level()
 {
     delete level_state.level;
-
+    
     switch(level_state.next_level)
     {
         case DYNAMICS:
-            level_state.level = new LevelDynamics();
-            level_state.level->init();
-            break;
+        level_state.level = new LevelDynamics();
+        level_state.level->init();
+        break;
         case COLLISION_DETECTION:
-            level_state.level = new LevelCollisionDetection();
-            level_state.level->init();
-            break;
+        level_state.level = new LevelCollisionDetection();
+        level_state.level->init();
+        break;
         case COLLISION_RESOLUTION:
-            level_state.level = new CollisionResolution::LevelCollisionResolution();
-            level_state.level->init();
-            break;
+        level_state.level = new CollisionResolution::LevelCollisionResolution();
+        level_state.level->init();
+        break;
+        case SIMPLE_CONSTRAINTS:
+        level_state.level = new SimpleConstraints::LevelSimpleConstraints();
+        level_state.level->init();
+        break;
         case SANDBOX:
-            level_state.level = new Sandbox::LevelSandbox();
-            level_state.level->init();
-            break;
+        level_state.level = new Sandbox::LevelSandbox();
+        level_state.level->init();
+        break;
     }
-
+    
     level_state.do_swap = false;
 }
 
@@ -73,12 +78,13 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
     {
         return 1;
     }
-
+    
     //set_next_level(DYNAMICS);
     //set_next_level(COLLISION_DETECTION);
     //set_next_level(COLLISION_RESOLUTION);
-    set_next_level(SANDBOX);
-
+    //set_next_level(SANDBOX);
+    set_next_level(SIMPLE_CONSTRAINTS);
+    
     // Main loop
     float timer = 0.0f;
     float last_time = 0.0f;
@@ -88,25 +94,25 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
         float current_time = get_time();
         timer += current_time - last_time;
         last_time = current_time;
-
+        
         if(timer >= STEP_TIME)
         {
             timer -= STEP_TIME;
-
+            
             if(level_state.do_swap)
             {
                 switch_level();
             }
-
+            
             level_state.level->step(STEP_TIME);
-
+            
             Graphics::clear_frame(v4(0.0f, 0.0f, 0.05f, 1.0f));
             Graphics::render();
             Graphics::swap_frames();
         }
     }
-
+    
     Graphics::uninit();
-
+    
     return 0;
 }

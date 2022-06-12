@@ -20,6 +20,7 @@ const v4 Color::YELLOW = v4(0.6f, 0.7f, 0.0f, 1.0f);
 const v4 Color::GREEN = v4(0.1f, 0.8f, 0.0f, 1.0f);
 const v4 Color::BLUE = v4(0.1f, 0.0f, 0.8f, 1.0f);
 const v4 Color::PURPLE = v4(0.5f, 0.0f, 0.7f, 1.0f);
+const v4 Color::WHITE = v4(0.8f, 0.8f, 0.8f, 1.0f);
 
 struct CameraState
 {
@@ -47,12 +48,12 @@ struct Shader
 struct GraphicsState
 {
     GLFWwindow *window;
-
+    
     float screen_aspect_ratio;
-
+    
     Texture *white_texture;
     v2 mouse_screen_position;
-
+    
     Shader *batch_quad_shader;
     ObjectBuffer *batch_quad_buffer;
     struct QuadRenderingData
@@ -62,7 +63,7 @@ struct GraphicsState
         v4 color;
         float rotation;
     };
-
+    
     Shader *batch_quad_outline_shader;
     ObjectBuffer *batch_quad_outline_buffer;
     struct QuadOutlineRenderingData
@@ -73,7 +74,7 @@ struct GraphicsState
         float rotation;
         float thickness;
     };
-
+    
     Shader *batch_circle_shader;
     ObjectBuffer *batch_circle_buffer;
     struct CircleRenderingData
@@ -82,7 +83,7 @@ struct GraphicsState
         float radius;
         v4 color;
     };
-
+    
     Shader *batch_circle_outline_shader;
     ObjectBuffer *batch_circle_outline_buffer;
     struct CircleOutlineRenderingData
@@ -92,7 +93,7 @@ struct GraphicsState
         v4 color;
         float thickness;
     };
-
+    
     Shader *batch_line_shader;
     ObjectBuffer *batch_line_buffer;
     struct LineRenderingData
@@ -102,13 +103,13 @@ struct GraphicsState
         float width;
         v4 color;
     };
-
+    
     void render_quad_batch(std::vector<QuadRenderingData> *packed_data);
     void render_quad_outline_batch(std::vector<QuadOutlineRenderingData> *packed_data);
     void render_circle_batch(std::vector<CircleRenderingData> *packed_data);
     void render_circle_outline_batch(std::vector<CircleOutlineRenderingData> *packed_data);
     void render_line_batch(std::vector<LineRenderingData> *packed_data);
-
+    
     struct LayerGroup
     {
         std::vector<GraphicsState::QuadRenderingData> quads_packed_buffer;
@@ -116,29 +117,29 @@ struct GraphicsState
         {
             quads_packed_buffer.push_back({quad->position, quad->half_extents, quad->color, quad->rotation});
         }
-
+        
         std::vector<GraphicsState::QuadOutlineRenderingData> quad_outlines_packed_buffer;
         void pack_quad_outline(QuadOutlineRenderingData *quad_outline)
         {
             quad_outlines_packed_buffer.push_back({quad_outline->position,
-                    quad_outline->half_extents, quad_outline->color,
-                    quad_outline->rotation, quad_outline->thickness});
+                                                      quad_outline->half_extents, quad_outline->color,
+                                                      quad_outline->rotation, quad_outline->thickness});
         }
-
+        
         std::vector<GraphicsState::CircleRenderingData> circles_packed_buffer;
         void pack_circle(CircleRenderingData *circle)
         {
             circles_packed_buffer.push_back({circle->position, circle->radius, circle->color});
         }
-
+        
         std::vector<GraphicsState::CircleOutlineRenderingData> circle_outlines_packed_buffer;
         void pack_circle_outline(CircleOutlineRenderingData *circle_outline)
         {
             circle_outlines_packed_buffer.push_back({circle_outline->position,
-                    circle_outline->radius, circle_outline->color,
-                    circle_outline->thickness});
+                                                        circle_outline->radius, circle_outline->color,
+                                                        circle_outline->thickness});
         }
-
+        
         std::vector<GraphicsState::LineRenderingData> lines_packed_buffer;
         void pack_line(LineRenderingData *line)
         {
@@ -174,23 +175,23 @@ static void reshape(GLFWwindow *window, int width, int height)
 static void key(GLFWwindow* window, int k, int s, int action, int mods)
 {
     if(action != GLFW_PRESS) return;
-
+    
     switch (k) {
         case GLFW_KEY_Z:
-            break;
+        break;
         case GLFW_KEY_ESCAPE:
-            glfwSetWindowShouldClose(window, GLFW_TRUE);
-            break;
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+        break;
         case GLFW_KEY_UP:
-            break;
+        break;
         case GLFW_KEY_DOWN:
-            break;
+        break;
         case GLFW_KEY_LEFT:
-            break;
+        break;
         case GLFW_KEY_RIGHT:
-            break;
+        break;
         default:
-            return;
+        return;
     }
 }
 
@@ -223,14 +224,14 @@ static bool read_shader_file(const char *path, char **vert_source, char **geom_s
     *vert_source = nullptr;
     *geom_source = nullptr;
     *frag_source = nullptr;
-
+    
     char *file = read_file_into_string(path);
     if(file == nullptr) return false;
-
+    
     int current_tag_length = 0;
     char *current_tag = nullptr;
     char *current_source_start = nullptr;
-
+    
     char *character = file;
     while(*character != '\0')
     {
@@ -252,15 +253,15 @@ static bool read_shader_file(const char *path, char **vert_source, char **geom_s
             {
                 *frag_source = current_source_start;
             }
-
-
+            
+            
             // Null terminate previous shader string
             *character = '\0';
-
+            
             // Read tag
             character++;
             char *tag = character;
-
+            
             // Move past tag
             while(!is_newline(character))
             {
@@ -268,7 +269,7 @@ static bool read_shader_file(const char *path, char **vert_source, char **geom_s
             }
             char *one_past_end_tag = character;
             while(is_newline(character)) character++;
-
+            
             current_tag_length = one_past_end_tag - tag;
             current_tag = tag;
             current_source_start = character;
@@ -278,7 +279,7 @@ static bool read_shader_file(const char *path, char **vert_source, char **geom_s
             character++;
         }
     }
-
+    
     // Finish reading current shader source
     if(current_tag == nullptr)
     {
@@ -295,17 +296,17 @@ static bool read_shader_file(const char *path, char **vert_source, char **geom_s
     {
         *frag_source = current_source_start;
     }
-
+    
     return true;
 }
 
 Shader *make_shader(const char *shader_path)
 {
     Shader *result = new Shader();
-
+    
     int  success;
     char info_log[512];
-
+    
     char *vert_source = nullptr;
     char *geom_source = nullptr;
     char *frag_source = nullptr;
@@ -315,7 +316,7 @@ Shader *make_shader(const char *shader_path)
         fprintf(stderr, "Could not open shader file %s\n", shader_path);
         return nullptr;
     }
-
+    
     unsigned int vert_shader;
     vert_shader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vert_shader, 1, &vert_source, NULL);
@@ -327,7 +328,7 @@ Shader *make_shader(const char *shader_path)
         fprintf(stderr, "VERTEX SHADER ERROR : %s\n%s\n", shader_path, info_log);
         return nullptr;
     }
-
+    
     unsigned int frag_shader;
     frag_shader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(frag_shader, 1, &frag_source, NULL);
@@ -339,8 +340,8 @@ Shader *make_shader(const char *shader_path)
         fprintf(stderr, "VERTEX SHADER ERROR : %s\n%s\n", shader_path, info_log);
         return nullptr;
     }
-
-
+    
+    
     unsigned int geom_shader;
     if(geom_source != nullptr)
     {
@@ -355,18 +356,18 @@ Shader *make_shader(const char *shader_path)
             return nullptr;
         }
     }
-
+    
     check_gl_errors("compiling shaders");
-
+    
     GLuint program = glCreateProgram();
     check_gl_errors("making program");
-
+    
     glAttachShader(program, vert_shader);
     glAttachShader(program, frag_shader);
     if(geom_source != nullptr) glAttachShader(program, geom_shader);
     glLinkProgram(program);
     check_gl_errors("linking program");
-
+    
     glGetProgramiv(program, GL_LINK_STATUS, &success);
     if(!success)
     {
@@ -374,13 +375,13 @@ Shader *make_shader(const char *shader_path)
         fprintf(stderr, "SHADER LINKING ERROR : %s\n%s\n", shader_path, info_log);
         return nullptr;
     }
-
+    
     glDeleteShader(vert_shader);
     glDeleteShader(frag_shader); 
     check_gl_errors("deleting shaders");
-
+    
     result->program = program;
-
+    
     return result;
 }
 
@@ -419,25 +420,25 @@ void set_uniform(Shader *shader, const char *name, mat4 value)
 static Texture *make_texture_from_bitmap(int width, int height, char *bitmap)
 {
     Texture *texture = new Texture();
-
+    
     glGenTextures(1, &texture->handle);
     glBindTexture(GL_TEXTURE_2D, texture->handle);
-
+    
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
+    
     check_gl_errors("make texture");
-
+    
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, bitmap);
     check_gl_errors("send texture data");
-
+    
     glGenerateMipmap(GL_TEXTURE_2D);
     check_gl_errors("generate mipmap");
-
+    
     return texture;
 }
 
@@ -450,14 +451,14 @@ static void use_texture(Texture *texture)
 void GraphicsState::render_quad_batch(std::vector<GraphicsState::QuadRenderingData> *packed_data)
 {
     if(packed_data->empty()) return;
-
+    
     Shader *shader = batch_quad_shader;
     ObjectBuffer *object_buffer = batch_quad_buffer;
-
+    
     use_shader(shader);
     mat4 project_m_world = Graphics::ndc_m_world();
     set_uniform(shader, "vp", project_m_world);
-
+    
     glBindVertexArray(object_buffer->vao);
     check_gl_errors("use vao");
     glBindBuffer(GL_ARRAY_BUFFER, object_buffer->vbo);
@@ -465,25 +466,25 @@ void GraphicsState::render_quad_batch(std::vector<GraphicsState::QuadRenderingDa
     assert(bytes <= (object_buffer->bytes_capacity));
     glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, packed_data->data());
     check_gl_errors("send quad data");
-
+    
     use_texture(white_texture);
-
+    
     glFinish();
-
+    
     glDrawArrays(GL_POINTS, 0, packed_data->size());
 }
 
 void GraphicsState::render_quad_outline_batch(std::vector<GraphicsState::QuadOutlineRenderingData> *packed_data)
 {
     if(packed_data->empty()) return;
-
+    
     Shader *shader = batch_quad_outline_shader;
     ObjectBuffer *object_buffer = batch_quad_outline_buffer;
-
+    
     use_shader(shader);
     mat4 project_m_world = Graphics::ndc_m_world();
     set_uniform(shader, "vp", project_m_world);
-
+    
     glBindVertexArray(object_buffer->vao);
     check_gl_errors("use vao");
     glBindBuffer(GL_ARRAY_BUFFER, object_buffer->vbo);
@@ -491,25 +492,25 @@ void GraphicsState::render_quad_outline_batch(std::vector<GraphicsState::QuadOut
     assert(bytes <= (object_buffer->bytes_capacity));
     glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, packed_data->data());
     check_gl_errors("send quad outline data");
-
+    
     use_texture(white_texture);
-
+    
     glFinish();
-
+    
     glDrawArrays(GL_POINTS, 0, packed_data->size());
 }
 
 void GraphicsState::render_circle_batch(std::vector<CircleRenderingData> *packed_data)
 {
     if(packed_data->empty()) return;
-
+    
     Shader *shader = batch_circle_shader;
     ObjectBuffer *object_buffer = batch_circle_buffer;
-
+    
     use_shader(shader);
     mat4 project_m_world = Graphics::ndc_m_world();
     set_uniform(shader, "vp", project_m_world);
-
+    
     glBindVertexArray(object_buffer->vao);
     check_gl_errors("use vao");
     glBindBuffer(GL_ARRAY_BUFFER, object_buffer->vbo);
@@ -517,23 +518,23 @@ void GraphicsState::render_circle_batch(std::vector<CircleRenderingData> *packed
     assert(bytes <= (object_buffer->bytes_capacity));
     glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, packed_data->data());
     check_gl_errors("send circle data");
-
+    
     glFinish();
-
+    
     glDrawArrays(GL_POINTS, 0, packed_data->size());
 }
 
 void GraphicsState::render_circle_outline_batch(std::vector<CircleOutlineRenderingData> *packed_data)
 {
     if(packed_data->empty()) return;
-
+    
     Shader *shader = batch_circle_outline_shader;
     ObjectBuffer *object_buffer = batch_circle_outline_buffer;
-
+    
     use_shader(shader);
     mat4 project_m_world = Graphics::ndc_m_world();
     set_uniform(shader, "vp", project_m_world);
-
+    
     glBindVertexArray(object_buffer->vao);
     check_gl_errors("use vao");
     glBindBuffer(GL_ARRAY_BUFFER, object_buffer->vbo);
@@ -541,23 +542,23 @@ void GraphicsState::render_circle_outline_batch(std::vector<CircleOutlineRenderi
     assert(bytes <= (object_buffer->bytes_capacity));
     glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, packed_data->data());
     check_gl_errors("send circle outline data");
-
+    
     glFinish();
-
+    
     glDrawArrays(GL_POINTS, 0, packed_data->size());
 }
 
 void GraphicsState::render_line_batch(std::vector<GraphicsState::LineRenderingData> *packed_data)
 {
     if(packed_data->empty()) return;
-
+    
     Shader *shader = batch_line_shader;
     ObjectBuffer *object_buffer = batch_line_buffer;
-
+    
     use_shader(shader);
     mat4 project_m_world = Graphics::ndc_m_world();
     set_uniform(shader, "vp", project_m_world);
-
+    
     glBindVertexArray(object_buffer->vao);
     check_gl_errors("use vao");
     glBindBuffer(GL_ARRAY_BUFFER, object_buffer->vbo);
@@ -565,9 +566,9 @@ void GraphicsState::render_line_batch(std::vector<GraphicsState::LineRenderingDa
     assert(bytes <= (object_buffer->bytes_capacity));
     glBufferSubData(GL_ARRAY_BUFFER, 0, bytes, packed_data->data());
     check_gl_errors("send line data");
-
+    
     glFinish();
-
+    
     glDrawArrays(GL_POINTS, 0, packed_data->size());
 }
 
@@ -585,7 +586,7 @@ static GraphicsState::LayerGroup *get_or_add_layer_group(int layer)
         group = new GraphicsState::LayerGroup();
         (*Graphics::instance->objects_to_render)[layer] = group;
     }
-
+    
     return group;
 }
 
@@ -650,7 +651,7 @@ void glfw_error_fn(int error, const char *message)
 bool Graphics::init()
 {
     instance = new GraphicsState();
-
+    
     {
         glfwSetErrorCallback(glfw_error_fn);
         if(!glfwInit())
@@ -658,7 +659,7 @@ bool Graphics::init()
             fprintf(stderr, "Failed to initialize GLFW\n");
             return false;
         }
-
+        
         int window_width = 1920 * 0.75f;
         int window_height = 1080 * 0.75f;
         instance->window = glfwCreateWindow(window_width, window_height, "My Game", NULL, NULL);
@@ -668,62 +669,62 @@ bool Graphics::init()
             glfwTerminate();
             return false;
         }
-
+        
         // Set callback functions
         glfwSetFramebufferSizeCallback(instance->window, reshape);
         glfwSetKeyCallback(instance->window, key);
-
+        
         glfwMakeContextCurrent(instance->window);
-
+        
         if(!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress))
         {
             fprintf(stderr, "Failed to initialize OpenGL context\n");
             return false;
         }
-
+        
         glfwSwapInterval(1);
-
+        
         int framebuffer_width, framebuffer_height;
         glfwGetFramebufferSize(instance->window, &framebuffer_width, &framebuffer_height);
         reshape(instance->window, framebuffer_width, framebuffer_height);
     }
-
+    
     //Graphics::ImGuiImplementation::init();
-
+    
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
+    
     Camera::instance = new CameraState();
-
+    
     int framebuffer_width, framebuffer_height;
     glfwGetFramebufferSize(instance->window, &framebuffer_width, &framebuffer_height);
     instance->screen_aspect_ratio = (float)framebuffer_width / framebuffer_height;
-
+    
     instance->objects_to_render = new std::map<int, GraphicsState::LayerGroup *>();
-
+    
     instance->batch_quad_shader = make_shader("assets/shaders/batch_quad.shader");
     instance->batch_quad_outline_shader = make_shader("assets/shaders/batch_quad_outline.shader");
     instance->batch_circle_shader = make_shader("assets/shaders/batch_circle.shader");
     instance->batch_circle_outline_shader = make_shader("assets/shaders/batch_circle_outline.shader");
     instance->batch_line_shader = make_shader("assets/shaders/batch_line.shader");
-
-
+    
+    
     // Make quad object buffer
     {
         instance->batch_quad_buffer = new ObjectBuffer();
         glGenVertexArrays(1, &instance->batch_quad_buffer->vao);
         glBindVertexArray(instance->batch_quad_buffer->vao);
         check_gl_errors("making vao");
-
+        
         glGenBuffers(1, &instance->batch_quad_buffer->vbo);
         check_gl_errors("making vbo");
-
+        
         static const int MAX_QUADS = 1024 * 1;
         glBindBuffer(GL_ARRAY_BUFFER, instance->batch_quad_buffer->vbo);
         glBufferData(GL_ARRAY_BUFFER, MAX_QUADS * sizeof(GraphicsState::QuadRenderingData), nullptr, GL_DYNAMIC_DRAW);
         check_gl_errors("send vbo data");
         instance->batch_quad_buffer->bytes_capacity = MAX_QUADS * sizeof(GraphicsState::QuadRenderingData);
-
+        
         float stride = sizeof(GraphicsState::QuadRenderingData);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, (void *)0); // Position
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, (void *)(1 * sizeof(v2))); // Scale
@@ -735,23 +736,23 @@ bool Graphics::init()
         glEnableVertexAttribArray(3);
         check_gl_errors("vertex attrib pointer");
     }
-
+    
     // Make quad outline object buffer
     {
         instance->batch_quad_outline_buffer = new ObjectBuffer();
         glGenVertexArrays(1, &instance->batch_quad_outline_buffer->vao);
         glBindVertexArray(instance->batch_quad_outline_buffer->vao);
         check_gl_errors("making vao");
-
+        
         glGenBuffers(1, &instance->batch_quad_outline_buffer->vbo);
         check_gl_errors("making vbo");
-
+        
         static const int MAX_QUAD_OUTLINES = 1024 * 1;
         glBindBuffer(GL_ARRAY_BUFFER, instance->batch_quad_outline_buffer->vbo);
         glBufferData(GL_ARRAY_BUFFER, MAX_QUAD_OUTLINES * sizeof(GraphicsState::QuadOutlineRenderingData), nullptr, GL_DYNAMIC_DRAW);
         check_gl_errors("send vbo data");
         instance->batch_quad_outline_buffer->bytes_capacity = MAX_QUAD_OUTLINES * sizeof(GraphicsState::QuadOutlineRenderingData);
-
+        
         float stride = sizeof(GraphicsState::QuadOutlineRenderingData);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, (void *)0); // Position
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, (void *)(1 * sizeof(v2))); // Scale
@@ -765,23 +766,23 @@ bool Graphics::init()
         glEnableVertexAttribArray(4);
         check_gl_errors("vertex attrib pointer");
     }
-
+    
     // Make circle object buffer
     {
         instance->batch_circle_buffer = new ObjectBuffer();
         glGenVertexArrays(1, &instance->batch_circle_buffer->vao);
         glBindVertexArray(instance->batch_circle_buffer->vao);
         check_gl_errors("making vao");
-
+        
         glGenBuffers(1, &instance->batch_circle_buffer->vbo);
         check_gl_errors("making vbo");
-
+        
         static const int MAX_CIRCLES = 1024 * 1;
         glBindBuffer(GL_ARRAY_BUFFER, instance->batch_circle_buffer->vbo);
         glBufferData(GL_ARRAY_BUFFER, MAX_CIRCLES * sizeof(GraphicsState::CircleRenderingData), nullptr, GL_DYNAMIC_DRAW);
         check_gl_errors("send vbo data");
         instance->batch_circle_buffer->bytes_capacity = MAX_CIRCLES * sizeof(GraphicsState::CircleRenderingData);
-
+        
         float stride = sizeof(GraphicsState::CircleRenderingData);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, (void *)0); // Position
         glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, stride, (void *)(2 * sizeof(float))); // Radius
@@ -791,23 +792,23 @@ bool Graphics::init()
         glEnableVertexAttribArray(2);
         check_gl_errors("vertex attrib pointer");
     }
-
+    
     // Make circle outline object buffer
     {
         instance->batch_circle_outline_buffer = new ObjectBuffer();
         glGenVertexArrays(1, &instance->batch_circle_outline_buffer->vao);
         glBindVertexArray(instance->batch_circle_outline_buffer->vao);
         check_gl_errors("making vao");
-
+        
         glGenBuffers(1, &instance->batch_circle_outline_buffer->vbo);
         check_gl_errors("making vbo");
-
+        
         static const int MAX_CIRCLE_OUTLINES = 1024 * 1;
         glBindBuffer(GL_ARRAY_BUFFER, instance->batch_circle_outline_buffer->vbo);
         glBufferData(GL_ARRAY_BUFFER, MAX_CIRCLE_OUTLINES * sizeof(GraphicsState::CircleOutlineRenderingData), nullptr, GL_DYNAMIC_DRAW);
         check_gl_errors("send vbo data");
         instance->batch_circle_outline_buffer->bytes_capacity = MAX_CIRCLE_OUTLINES * sizeof(GraphicsState::CircleOutlineRenderingData);
-
+        
         float stride = sizeof(GraphicsState::CircleOutlineRenderingData);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, (void *)0); // Position
         glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, stride, (void *)(2 * sizeof(float))); // Radius
@@ -819,22 +820,22 @@ bool Graphics::init()
         glEnableVertexAttribArray(3);
         check_gl_errors("vertex attrib pointer");
     }
-
+    
     {
         instance->batch_line_buffer = new ObjectBuffer();
         glGenVertexArrays(1, &instance->batch_line_buffer->vao);
         glBindVertexArray(instance->batch_line_buffer->vao);
         check_gl_errors("making vao");
-
+        
         glGenBuffers(1, &instance->batch_line_buffer->vbo);
         check_gl_errors("making vbo");
-
+        
         static const int MAX_LINES = 1024 * 1;
         glBindBuffer(GL_ARRAY_BUFFER, instance->batch_line_buffer->vbo);
         glBufferData(GL_ARRAY_BUFFER, MAX_LINES * sizeof(GraphicsState::LineRenderingData), nullptr, GL_DYNAMIC_DRAW);
         check_gl_errors("send vbo data");
         instance->batch_line_buffer->bytes_capacity = 256 * sizeof(GraphicsState::LineRenderingData);
-
+        
         float stride = sizeof(GraphicsState::LineRenderingData);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, (void *)0);
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, (void *)(1 * sizeof(v2)));
@@ -846,14 +847,14 @@ bool Graphics::init()
         glEnableVertexAttribArray(3);
         check_gl_errors("vertex attrib pointer");
     }
-
+    
     
     // Make texture
     {
         char bitmap[] = { (char)255, (char)255, (char)255, (char)255 };
         instance->white_texture = make_texture_from_bitmap(1, 1, bitmap);
     }
-
+    
     return true;
 }
 
@@ -872,39 +873,39 @@ void Graphics::clear_frame(v4 color)
 void Graphics::render()
 {
     std::map<int, GraphicsState::LayerGroup *> *objects_to_render = instance->objects_to_render;
-
+    
     for(std::pair<int, GraphicsState::LayerGroup *> pair : *objects_to_render)
     {
         GraphicsState::LayerGroup *group = pair.second;
-
+        
         // Render all quads
         instance->render_quad_batch(&group->quads_packed_buffer);
         group->quads_packed_buffer.clear();
-
+        
         // Render all quad outlines
         instance->render_quad_outline_batch(&group->quad_outlines_packed_buffer);
         group->quad_outlines_packed_buffer.clear();
-
+        
         // Render all circles
         instance->render_circle_batch(&group->circles_packed_buffer);
         group->circles_packed_buffer.clear();
-
+        
         // Render all circles
         instance->render_circle_outline_batch(&group->circle_outlines_packed_buffer);
         group->circle_outlines_packed_buffer.clear();
-
+        
         // Render all lines
         instance->render_line_batch(&group->lines_packed_buffer);
         group->lines_packed_buffer.clear();
     }
-
+    
 }
 
 void Graphics::swap_frames()
 {
     glFinish();
     glfwSwapBuffers(instance->window);
-
+    
     // TODO: Probably move these
     glfwPollEvents();
     double x, y;
@@ -939,7 +940,7 @@ GameMath::mat4 Graphics::ndc_m_world()
         0.0f, 0.0f, 1.0f, 0.0f,
         0.0f, 0.0f, 0.0f, 1.0f
     };
-
+    
     return ndc_m_view * view_m_world();
 }
 
@@ -955,18 +956,18 @@ GameMath::v2 Graphics::mouse_world_position()
     glfwGetFramebufferSize(instance->window, &framebuffer_width, &framebuffer_height);
     float screen_width =(float)framebuffer_width; 
     float screen_height = (float)framebuffer_height;
-
+    
     p.y = screen_height - p.y;
-
+    
     GameMath::v2 ndc =
     {
         (p.x / screen_width)  * 2.0f - 1.0f,
         (p.y / screen_height) * 2.0f - 1.0f,
     };
-
+    
     GameMath::v4 ndc4 = {ndc, 0.0f, 1.0f};
     GameMath::v4 world4 = Graphics::world_m_ndc() * ndc4;
-
+    
     return GameMath::v2(world4.x, world4.y);
 }
 
