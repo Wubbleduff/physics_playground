@@ -88,7 +88,7 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
     // Main loop
     float timer = 0.0f;
     float last_time = 0.0f;
-    const static float STEP_TIME = 0.016f;
+    const static float STEP_TIME = 0.008f;
     while(!Graphics::wants_to_close())
     {
         float current_time = get_time();
