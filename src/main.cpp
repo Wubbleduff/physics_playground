@@ -12,6 +12,7 @@
 #include "collision_resolution/collision_resolution.h"
 #include "simple_constraints/simple_constraints.h"
 #include "sandbox/sandbox.h"
+#include "chain/chain.h"
 
 #include <windows.h>
 #include <GLFW/glfw3.h>
@@ -66,6 +67,10 @@ static void switch_level()
         level_state.level = new Sandbox::LevelSandbox();
         level_state.level->init();
         break;
+        case CHAIN:
+        level_state.level = new Chain::LevelChain();
+        level_state.level->init();
+        break;
     }
     
     level_state.do_swap = false;
@@ -83,7 +88,8 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
     //set_next_level(COLLISION_DETECTION);
     //set_next_level(COLLISION_RESOLUTION);
     //set_next_level(SANDBOX);
-    set_next_level(SIMPLE_CONSTRAINTS);
+    //set_next_level(SIMPLE_CONSTRAINTS);
+    set_next_level(CHAIN);
     
     // Main loop
     float timer = 0.0f;

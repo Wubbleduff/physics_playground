@@ -8,6 +8,7 @@ enum LevelID
     COLLISION_RESOLUTION,
     SIMPLE_CONSTRAINTS,
     SANDBOX,
+    CHAIN,
 };
 
 struct Level
