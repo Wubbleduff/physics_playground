@@ -87,9 +87,9 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
     //set_next_level(DYNAMICS);
     //set_next_level(COLLISION_DETECTION);
     //set_next_level(COLLISION_RESOLUTION);
-    //set_next_level(SANDBOX);
+    set_next_level(SANDBOX);
     //set_next_level(SIMPLE_CONSTRAINTS);
-    set_next_level(CHAIN);
+    //set_next_level(CHAIN);
     
     // Main loop
     float timer = 0.0f;
@@ -104,6 +104,8 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
         if(timer >= STEP_TIME)
         {
             timer -= STEP_TIME;
+
+            glfwPollEvents();
             
             if(level_state.do_swap)
             {

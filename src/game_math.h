@@ -221,8 +221,6 @@ namespace GameMath
     // Returns a counter-clockwise normal to the given vector with the same length
     v2 find_ccw_normal(v2 a);
     
-    float cross(v2 a, v2 b, v2 c);
-    
     bool is_ccw(v2 a, v2 b, v2 c);
     
     // Returns this vector rotated by the angle in radians

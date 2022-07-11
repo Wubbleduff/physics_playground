@@ -54,10 +54,11 @@ namespace Sandbox
     
     struct Collision
     {
+        float depth;
+        GameMath::v2 normal;
+
         GameMath::v2 a_in_b;
         GameMath::v2 b_in_a;
-        
-        GameMath::v2 normal;
         
         Kinematics *a_kinematics;
         Kinematics *b_kinematics;

@@ -40,6 +40,8 @@ struct Graphics
     static GameMath::mat4 world_m_ndc();
     
     static GameMath::v2 mouse_world_position();
+
+    static struct GLFWwindow *get_graphics_window();
     
     struct Camera
     {

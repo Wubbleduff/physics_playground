@@ -637,6 +637,11 @@ void Graphics::arrow(v2 start, v2 end, float half_width, v4 color, int layer)
     Graphics::line(end, end + rotate_vector(leg, -PI / 8.0f), half_width, color, layer);
 }
 
+GLFWwindow *Graphics::get_graphics_window()
+{
+    return Graphics::instance->window;
+}
+
 
 
 
@@ -777,7 +782,7 @@ bool Graphics::init()
         glGenBuffers(1, &instance->batch_circle_buffer->vbo);
         check_gl_errors("making vbo");
         
-        static const int MAX_CIRCLES = 1024 * 1;
+        static const int MAX_CIRCLES = 1024 * 10;
         glBindBuffer(GL_ARRAY_BUFFER, instance->batch_circle_buffer->vbo);
         glBufferData(GL_ARRAY_BUFFER, MAX_CIRCLES * sizeof(GraphicsState::CircleRenderingData), nullptr, GL_DYNAMIC_DRAW);
         check_gl_errors("send vbo data");

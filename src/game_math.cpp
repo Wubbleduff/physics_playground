@@ -271,14 +271,9 @@ namespace GameMath
         return v2(-a.y, a.x);
     }
 
-    float cross(v2 a, v2 b, v2 c)
-    {
-        return (b.x - a.x)*(c.y - a.y) - (b.y - a.y)*(c.x - a.x);
-    }
-
     bool is_ccw(v2 a, v2 b, v2 c)
     {
-        float cross_p = cross(a, b, c);
+        float cross_p = (b.x - a.x)*(c.y - a.y) - (b.y - a.y)*(c.x - a.x);
         return cross_p > 0.0f;
     }
 

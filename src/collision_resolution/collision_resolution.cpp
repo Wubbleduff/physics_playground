@@ -306,45 +306,6 @@ void LevelCollisionResolution::step(float time_step)
     bool collided = box_circle(&b1.shape, &b2.shape, &c);
     if(collided)
     {
-        //
-        // Collision resolution is based on the following contraints:
-        // * We can simplify a tiny window of large forces into an impulse (just an instant change in velocity).
-        //   We need to figure out how much of a change in velocity we need to apply.
-        // * With a frictionless collision, we only apply an impulse in the axis of the collision normal. This
-        //   simplifies the collision into a 1 dimensional resolution problem: we can look at the relative
-        //   velocities along the collision normal.
-        // * Newton's law of restituion: relative_velocity_after = e * -relative_velocity_before
-        // * Applying the impluse: velocity_after = velocity_before + impulse   ->
-        //                         velocity_after = velocity_before + (j / M)*n
-        // 
-        // Combining these equations, we can figure out what impulse to apply:
-        // impulse = direction of the collision * impulse magnitude
-        // We know the direction of the impulse: the collision normal. The magnitude of the impulse is (j / M).
-        // In otherwords, we need to find j.
-        // Using the equations above:
-        // * relative_velocity_after*n = e * -relative_velocity_before*n ->
-        //   (va_after - vb_after)*n = e * -(va_before - vb_before)*n
-        // and
-        // * va_after = va_before + (j / M_a)*n
-        //   vb_after = vb_before - (j / M_b)*n
-        // algebra.exe
-        // j = -(1 + e)*(va_before - vb_before) * n
-        //     ------------------------------------
-        //            n * n*(1/M_a + 1/M_b)        
-        // 
-        // Plug j back into equations for applying impulse and collision is resolved.
-        //
-        // For rotations, we follow a similar set of constarints:
-        // * wa_after = wa_before + (r_ap * j*n) / Ia
-        // * wb_after = wb_before - (r_bp * j*n) / Ib
-        // w is rotational velocity.
-        // rp_ab is perp-dot-product of the point of application that same as in dynamics.
-        // I is moment of inertia.
-        //
-        // j =           -(1 + e)*(va_before - vb_before) * n
-        //     --------------------------------------------------------
-        //     n * n*(1/M_a + 1/M_b) + (r_ap * n)^2/Ia + (r_bp * n)^2/Ia
-        //
 
         // Check if we're moving towards each other. Otherwise, we're moving out and we shouldn't change velocities anyways.
         if(dot(b2.shape.center - b1.shape.center, b1.velocity) > 0.0f)

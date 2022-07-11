@@ -148,12 +148,14 @@ namespace Sandbox
             collision->a_in_b = min_contact_points[0];
             collision->b_in_a = min_contact_points[1];
             collision->normal = -normalize(min_separating_normal);
+            collision->depth = length(min_separating_normal);
         }
         else
         {
             collision->b_in_a = min_contact_points[0];
             collision->a_in_b = min_contact_points[1];
             collision->normal = normalize(min_separating_normal);
+            collision->depth = length(min_separating_normal);
         }
         
         return true;
@@ -202,6 +204,7 @@ namespace Sandbox
                 collision->a_in_b = rotate_vector(collision->a_in_b, box->rotation);
                 collision->b_in_a = rotate_vector(collision->b_in_a, box->rotation);
                 collision->normal = rotate_vector(normal, box->rotation);
+                collision->depth = min_diff;
                 collision->a_in_b += box->center;
                 collision->b_in_a += box->center;
                 
@@ -225,6 +228,7 @@ namespace Sandbox
                 collision->b_in_a += box->center;
                 
                 collision->normal = normalize(collision->a_in_b - collision->b_in_a);
+                collision->depth = length(collision->a_in_b - collision->b_in_a);
                 
                 if(EQ(collision->a_in_b, collision->b_in_a))
                 {
@@ -246,12 +250,11 @@ namespace Sandbox
         if((l > a->radius + b->radius) || EQ(l, a->radius + b->radius))
         {
             // No collision.
-            // In the case where the contact points are approximately equal, we want to treat
-            // this as no collision because the normal will be inaccurate.
             return false;
         }
         else 
         {
+
             // Collision.
             if(EQ(a->center, b->center))
             {
@@ -260,15 +263,11 @@ namespace Sandbox
             }
             
             v2 ndiff = normalize(diff);
+
+            collision->normal = ndiff;
+            collision->depth = a->radius + b->radius - l;
             collision->a_in_b = a->center + ndiff * a->radius;
             collision->b_in_a = b->center - ndiff * b->radius;
-            collision->normal = ndiff;
-            
-            //mfritz
-            if(EQ(collision->a_in_b, collision->b_in_a))
-            {
-                return false;
-            }
             
             return true;
         }
@@ -283,14 +282,16 @@ namespace Sandbox
     
     static void update_body(Kinematics *kinematics, v2 *position, float *rotation, float time_step)
     {
-        static const float air_drag = 3.0f;
+        static const float air_drag = 0.2f;
         static const float rotational_air_drag = 1.0f;
         static const float gravity = 9.81f;
+
+        if(kinematics->is_static) return;
         
         v2 drag_force = 0.5f * -kinematics->velocity * air_drag;
         kinematics->apply_force(drag_force, v2());
         
-        kinematics->apply_force(v2(0.0f, -gravity), v2());
+        kinematics->apply_force(v2(0.0f, -gravity * (1.0f / kinematics->inv_mass)), v2());
         
         kinematics->velocity += kinematics->acceleration_sum * time_step;
         *position += kinematics->velocity * time_step;
@@ -322,12 +323,13 @@ namespace Sandbox
         //time_t t;
         //seed_random((unsigned)time(&t));
         seed_random(42);
-        for(int i = 0; i < 10; i++)
+#if 1
+        for(int i = 0; i < 2; i++)
         {
             v2 position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
             v2 scale = v2(random_range(0.1f, 0.8f), random_range(0.1f, 0.8f));
             float inv_mass = 1.0f / (scale.x * scale.y);
-            float inv_moment_of_inertia = inv_mass;
+            float inv_moment_of_inertia = 1.0f;
             
             v2 velocity = v2(random_range(-10.0f, 10.0f), random_range(-10.0f, 10.0f));
             //float angular_velocity = random_range(-10.0f, 10.0f);
@@ -337,18 +339,24 @@ namespace Sandbox
                           Box { position, scale, 0.0f }
                           );
         }
+#endif
         
 #if 1
-        for(int i = 0; i < 10; i++)
+        int num_circles = 2;
+        for(int i = 0; i < num_circles; i++)
         {
             v2 position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
-            float radius = random_range(0.1f, 0.8f);
-            float inv_mass = 1.0f / (PI * radius*radius);
-            float inv_moment_of_inertia = inv_mass;
+            //float radius = random_range(0.1f, 0.8f);
+            //float inv_mass = 1.0f / (PI * radius*radius);
+            //float inv_moment_of_inertia = inv_mass;
+
+            float radius = 0.5f;
+            float inv_mass = 1.0f;
+            float inv_moment_of_inertia = 5.0f;
             
             v2 velocity = v2(random_range(-10.0f, 10.0f), random_range(-10.0f, 10.0f));
-            //float angular_velocity = random_range(-10.0f, 10.0f);
-            float angular_velocity = 0.0f;
+            float angular_velocity = random_range(-10.0f, 10.0f);
+            //float angular_velocity = 0.0f;
             make_body_circle(
                              Kinematics { velocity, angular_velocity, v2(), 0.0f, inv_mass, inv_moment_of_inertia, false, },
                              Circle{ position, radius, 0.0f }
@@ -380,17 +388,19 @@ namespace Sandbox
         int step_count = 8;
         for(int step_i = 0; step_i < step_count; step_i++)
         {
+            float sub_time_step = time_step / step_count;
+
             for(int i = 0; i < box_list.kinematics.size(); i++)
             {
                 Kinematics &kinematics = box_list.kinematics[i];
                 Box &geometry = box_list.geometry[i];
-                update_body(&kinematics, &geometry.center, &geometry.rotation, time_step / (float)step_count);
+                update_body(&kinematics, &geometry.center, &geometry.rotation, sub_time_step);
             }
             for(int i = 0; i < circle_list.kinematics.size(); i++)
             {
                 Kinematics &kinematics = circle_list.kinematics[i];
                 Circle &geometry = circle_list.geometry[i];
-                update_body(&kinematics, &geometry.center, &geometry.rotation, time_step / (float)step_count);
+                update_body(&kinematics, &geometry.center, &geometry.rotation, sub_time_step);
             }
             
 #if 1
@@ -418,7 +428,7 @@ namespace Sandbox
                         c.a_center_of_mass = &(box_list.geometry[box1i].center);
                         c.b_center_of_mass = &(box_list.geometry[box2i].center);
                         collisions.push_back(c);
-                        assert(!EQ(c.a_in_b, c.b_in_a));
+                        assert(!EQ(c.normal, v2()));
                     }
                 }
             }
@@ -438,7 +448,7 @@ namespace Sandbox
                         c.a_center_of_mass = &(box_list.geometry[boxi].center);
                         c.b_center_of_mass = &(circle_list.geometry[circlei].center);
                         collisions.push_back(c);
-                        assert(!EQ(c.a_in_b, c.b_in_a));
+                        assert(!EQ(c.normal, v2()));
                     }
                 }
             }
@@ -458,7 +468,7 @@ namespace Sandbox
                         c.a_center_of_mass = &(circle_list.geometry[circle1i].center);
                         c.b_center_of_mass = &(circle_list.geometry[circle2i].center);
                         collisions.push_back(c);
-                        assert(!EQ(c.a_in_b, c.b_in_a));
+                        assert(!EQ(c.normal, v2()));
                     }
                 }
             }
@@ -467,46 +477,6 @@ namespace Sandbox
             collision_responses.resize(collisions.size());
             for(int collisioni = 0; collisioni < collisions.size(); collisioni++)
             {
-                //
-                // Collision resolution is based on the following contraints:
-                // * We can simplify a tiny window of large forces into an impulse (just an instant change in velocity).
-                //   We need to figure out how much of a change in velocity we need to apply.
-                // * With a frictionless collision, we only apply an impulse in the axis of the collision normal. This
-                //   simplifies the collision into a 1 dimensional resolution problem: we can look at the relative
-                //   velocities along the collision normal.
-                // * Newton's law of restituion: relative_velocity_after = e * -relative_velocity_before
-                // * Applying the impluse: velocity_after = velocity_before + impulse   ->
-                //                         velocity_after = velocity_before + (j / M)*n
-                // 
-                // Combining these equations, we can figure out what impulse to apply:
-                // impulse = direction of the collision * impulse magnitude
-                // We know the direction of the impulse: the collision normal. The magnitude of the impulse is (j / M).
-                // In otherwords, we need to find j.
-                // Using the equations above:
-                // * relative_velocity_after*n = e * -relative_velocity_before*n ->
-                //   (va_after - vb_after)*n = e * -(va_before - vb_before)*n
-                // and
-                // * va_after = va_before + (j / M_a)*n
-                //   vb_after = vb_before - (j / M_b)*n
-                // algebra.exe
-                // j = -(1 + e)*(va_before - vb_before) * n
-                //     ------------------------------------
-                //            n * n*(1/M_a + 1/M_b)        
-                // 
-                // Plug j back into equations for applying impulse and collision is resolved.
-                //
-                // For rotations, we follow a similar set of constarints:
-                // * wa_after = wa_before + (r_ap * j*n) / Ia
-                // * wb_after = wb_before - (r_bp * j*n) / Ib
-                // w is rotational velocity.
-                // rp_ab is perp-dot-product of the point of application that same as in dynamics.
-                // I is moment of inertia.
-                //
-                // j =           -(1 + e)*(va_before - vb_before) * n
-                //     --------------------------------------------------------
-                //     n * n*(1/M_a + 1/M_b) + (r_ap * n)^2/Ia + (r_bp * n)^2/Ia
-                //
-                
                 Collision &collision = collisions[collisioni];
                 CollisionResponse &collision_response = collision_responses[collisioni];
                 
@@ -524,22 +494,18 @@ namespace Sandbox
                 float b_angular_velocity = collision.b_kinematics->angular_velocity;
                 float b_inv_mass = collision.b_kinematics->inv_mass;
                 float b_inv_moment_of_inertia = collision.b_kinematics->inv_moment_of_inertia;
+
+                float depth = collision.depth;
                 
-                // Collision normal.
-                // This is built with the assumption that the collision manifolds are well-formed (the normal won't be length 0).
-                //v2 n = a_in_b - b_in_a;
-                v2 n = collision.normal * length(a_in_b - b_in_a);
+                v2 n = normalize(collision.normal);
                 assert(!EQ(n, v2()));
                 
                 // Used for later calculations for determining linear velocity from rotational velocity.
-                v2 r_ap = find_ccw_normal(a_in_b - *a_center_of_mass);
-                v2 r_bp = find_ccw_normal(b_in_a - *b_center_of_mass);
-                
-                // Find velocities of each of the contact points.
-                v2 a_in_b_contact_velocity = a_velocity + r_ap * a_angular_velocity;
-                v2 b_in_a_contact_velocity = b_velocity + r_bp * b_angular_velocity;
-                
-                v2 relative_velocity = a_in_b_contact_velocity - b_in_a_contact_velocity;
+                v2 ra = a_in_b - *a_center_of_mass;
+                v2 rb = b_in_a - *b_center_of_mass;
+                v2 r_ap = find_ccw_normal(ra);
+                v2 r_bp = find_ccw_normal(rb);
+                v2 relative_velocity = (a_velocity + r_ap * a_angular_velocity) - (b_velocity + r_bp * b_angular_velocity);
                 
                 if(dot(relative_velocity, n) < 0.0f)
                 {
@@ -547,64 +513,33 @@ namespace Sandbox
                     continue;
                 }
                 
-                static const float e = 0.5f;
-                
-                // Velocity resolution.
-                {
-                    float j = (-(1.0f + e) * dot(relative_velocity, n)) /
-                    (dot(n, n * (a_inv_mass + b_inv_mass)));
-                    
-                    collision_response.a_vel = (j * a_inv_mass) * n;
-                    collision_response.b_vel = -(j * b_inv_mass) * n;
-                }
-                
-                // Angular velocity resolution.
-                {
-                    float j = (-(1.0f + e) * dot(relative_velocity, n)) /
-                    (dot(n, n * (a_inv_mass + b_inv_mass)) + (squared(dot(r_ap, n)) * a_inv_moment_of_inertia) + (squared(dot(r_bp, n)) * b_inv_moment_of_inertia));
-                    
-                    collision_response.a_angular_vel = dot(r_ap, j * n) * a_inv_moment_of_inertia;
-                    collision_response.b_angular_vel = -dot(r_bp, j * n) * b_inv_moment_of_inertia;
-                }
-                
-                // Position resolution.
-                // This cheats by pushing objects out of each other modifying position directly. This is needed
-                // so objects don't slowly sink into each other. When velocities of each object are very small,
-                // impulse resolution isn't accurate enough. Positional correction makes of for this at small scales.
-                {
-                    static const float percent = 0.8f;
-                    static const float slop = 0.01f;
-                    
-                    v2 n_unit = normalize(n);
-                    float pen_depth = length(n);
-                    pen_depth = max(pen_depth - slop, 0.0f);
-                    v2 correction = n_unit * pen_depth * percent;
-                    
-                    float a_factor = 0.0f;
-                    float b_factor = 0.0f;
-                    
-                    if(collision.a_kinematics->is_static && !collision.b_kinematics->is_static)
-                    {
-                        a_factor = 0.0f;
-                        b_factor = 1.0f;
-                    }
-                    else if(collision.b_kinematics->is_static && !collision.a_kinematics->is_static)
-                    {
-                        a_factor = 1.0f;
-                        b_factor = 0.0f;
-                    }
-                    else
-                    {
-                        float a_mass = 1.0f / a_inv_mass;
-                        float b_mass = 1.0f / b_inv_mass;
-                        a_factor = a_mass / (a_mass + b_mass);
-                        b_factor = b_mass / (a_mass + b_mass);
-                        
-                    }
-                    
-                    collision_response.a_pos = -correction * a_factor;
-                    collision_response.b_pos = correction * b_factor;
-                }
+                // Calculate jacobian
+                v2 j_va = -n;
+                v3 j_wa = -cross(v3(ra, 0.0f), v3(n, 0.0f)); // TODO I don't get what this is.
+                v2 j_vb = n;
+                v3 j_wb = cross(v3(rb, 0.0f), v3(n, 0.0f)); // TODO I don't get what this is.
+                float k =
+                    a_inv_mass +
+                    dot(j_wa, a_inv_moment_of_inertia * j_wa) + // TODO I don't get what this is.
+                    b_inv_mass +
+                    dot(j_wb, b_inv_moment_of_inertia * j_wb); // TODO I don't get what this is.
+                float effective_mass = 1.0f / k;
+
+                float jv =
+                    dot(j_va, a_velocity) +
+                    dot(j_wa, v3(0.0f, 0.0f, a_angular_velocity)) +
+                    dot(j_vb, b_velocity) +
+                    dot(j_wb, v3(0.0f, 0.0f, b_angular_velocity));
+
+                float beta = 0.2f;
+                float b = (beta / sub_time_step) * -depth;
+
+                float lambda = effective_mass * -(jv + b);
+
+                collision_response.a_vel = j_va * lambda * a_inv_mass;
+                collision_response.a_angular_vel = (j_wa * lambda * a_inv_moment_of_inertia).z;
+                collision_response.b_vel = j_vb * lambda * b_inv_mass;
+                collision_response.b_angular_vel = (j_wb * lambda * b_inv_moment_of_inertia).z;
                 
             }
             
@@ -618,8 +553,8 @@ namespace Sandbox
                 collision.b_kinematics->velocity += collision_response.b_vel;
                 collision.a_kinematics->angular_velocity += collision_response.a_angular_vel;
                 collision.b_kinematics->angular_velocity += collision_response.b_angular_vel;
-                *collision.a_center_of_mass += collision_response.a_pos;
-                *collision.b_center_of_mass += collision_response.b_pos;
+                //*collision.a_center_of_mass += collision_response.a_pos;
+                //*collision.b_center_of_mass += collision_response.b_pos;
             }
 #endif
             
