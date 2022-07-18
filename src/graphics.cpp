@@ -835,11 +835,11 @@ bool Graphics::init()
         glGenBuffers(1, &instance->batch_line_buffer->vbo);
         check_gl_errors("making vbo");
         
-        static const int MAX_LINES = 1024 * 1;
+        static const int MAX_LINES = 1024 * 10;
         glBindBuffer(GL_ARRAY_BUFFER, instance->batch_line_buffer->vbo);
         glBufferData(GL_ARRAY_BUFFER, MAX_LINES * sizeof(GraphicsState::LineRenderingData), nullptr, GL_DYNAMIC_DRAW);
         check_gl_errors("send vbo data");
-        instance->batch_line_buffer->bytes_capacity = 256 * sizeof(GraphicsState::LineRenderingData);
+        instance->batch_line_buffer->bytes_capacity = MAX_LINES * sizeof(GraphicsState::LineRenderingData);
         
         float stride = sizeof(GraphicsState::LineRenderingData);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, (void *)0);

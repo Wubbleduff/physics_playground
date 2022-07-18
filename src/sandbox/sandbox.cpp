@@ -278,6 +278,15 @@ namespace Sandbox
     
     
     
+    inline v2 box2d_cross(float s, v2 a)
+    {
+        return v2(-s * a.y, s * a.x);
+    }
+
+    inline float box2d_cross(v2 a, v2 b)
+    {
+        return a.x * b.y - a.y * b.x;
+    }
     
     
     static void update_body(Kinematics *kinematics, v2 *position, float *rotation, float time_step)
@@ -289,9 +298,8 @@ namespace Sandbox
         if(kinematics->is_static) return;
         
         v2 drag_force = 0.5f * -kinematics->velocity * air_drag;
-        kinematics->apply_force(drag_force, v2());
-        
-        kinematics->apply_force(v2(0.0f, -gravity * (1.0f / kinematics->inv_mass)), v2());
+        kinematics->force_sum += drag_force;
+        kinematics->apply_force(v2(0.0f, -gravity * (1.0f / kinematics->inv_mass)), *position);
         
         kinematics->velocity += kinematics->acceleration_sum * time_step;
         *position += kinematics->velocity * time_step;
@@ -322,14 +330,14 @@ namespace Sandbox
         
         //time_t t;
         //seed_random((unsigned)time(&t));
-        seed_random(42);
+        seed_random(1);
 #if 1
-        for(int i = 0; i < 2; i++)
+        for(int i = 0; i < 50; i++)
         {
             v2 position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
-            v2 scale = v2(random_range(0.1f, 0.8f), random_range(0.1f, 0.8f));
+            v2 scale = v2(random_range(0.1f, 0.3f), random_range(0.1f, 0.3f));
             float inv_mass = 1.0f / (scale.x * scale.y);
-            float inv_moment_of_inertia = 1.0f;
+            float inv_moment_of_inertia = 5.0f;
             
             v2 velocity = v2(random_range(-10.0f, 10.0f), random_range(-10.0f, 10.0f));
             //float angular_velocity = random_range(-10.0f, 10.0f);
@@ -342,18 +350,14 @@ namespace Sandbox
 #endif
         
 #if 1
-        int num_circles = 2;
+        int num_circles = 50;
         for(int i = 0; i < num_circles; i++)
         {
             v2 position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
-            //float radius = random_range(0.1f, 0.8f);
-            //float inv_mass = 1.0f / (PI * radius*radius);
-            //float inv_moment_of_inertia = inv_mass;
+            float radius = random_range(0.1f, 0.3f);
+            float inv_mass = 1.0f / (PI * radius*radius);
+            float inv_moment_of_inertia = inv_mass;
 
-            float radius = 0.5f;
-            float inv_mass = 1.0f;
-            float inv_moment_of_inertia = 5.0f;
-            
             v2 velocity = v2(random_range(-10.0f, 10.0f), random_range(-10.0f, 10.0f));
             float angular_velocity = random_range(-10.0f, 10.0f);
             //float angular_velocity = 0.0f;
@@ -385,7 +389,7 @@ namespace Sandbox
     
     void LevelSandbox::step(float time_step)
     {
-        int step_count = 8;
+        int step_count = 4;
         for(int step_i = 0; step_i < step_count; step_i++)
         {
             float sub_time_step = time_step / step_count;
@@ -500,50 +504,32 @@ namespace Sandbox
                 v2 n = normalize(collision.normal);
                 assert(!EQ(n, v2()));
                 
-                // Used for later calculations for determining linear velocity from rotational velocity.
                 v2 ra = a_in_b - *a_center_of_mass;
                 v2 rb = b_in_a - *b_center_of_mass;
-                v2 r_ap = find_ccw_normal(ra);
-                v2 r_bp = find_ccw_normal(rb);
-                v2 relative_velocity = (a_velocity + r_ap * a_angular_velocity) - (b_velocity + r_bp * b_angular_velocity);
+                v2 relative_velocity = -(a_velocity + box2d_cross(a_angular_velocity, ra)) + (b_velocity + box2d_cross(b_angular_velocity, rb));
                 
-                if(dot(relative_velocity, n) < 0.0f)
-                {
-                    // The bodies are leaving each other. No resolution necessary.
-                    continue;
-                }
-                
-                // Calculate jacobian
-                v2 j_va = -n;
-                v3 j_wa = -cross(v3(ra, 0.0f), v3(n, 0.0f)); // TODO I don't get what this is.
-                v2 j_vb = n;
-                v3 j_wb = cross(v3(rb, 0.0f), v3(n, 0.0f)); // TODO I don't get what this is.
-                float k =
-                    a_inv_mass +
-                    dot(j_wa, a_inv_moment_of_inertia * j_wa) + // TODO I don't get what this is.
-                    b_inv_mass +
-                    dot(j_wb, b_inv_moment_of_inertia * j_wb); // TODO I don't get what this is.
-                float effective_mass = 1.0f / k;
+		float rna = dot(ra, n);
+		float rnb = dot(rb, n);
+		float k_normal = a_inv_mass + b_inv_mass;
+		k_normal += a_inv_moment_of_inertia * (dot(ra, ra) - rna * rna) + b_inv_moment_of_inertia * (dot(rb, rb) - rnb * rnb);
+		float effective_mass = 1.0f / k_normal;
 
-                float jv =
-                    dot(j_va, a_velocity) +
-                    dot(j_wa, v3(0.0f, 0.0f, a_angular_velocity)) +
-                    dot(j_vb, b_velocity) +
-                    dot(j_wb, v3(0.0f, 0.0f, b_angular_velocity));
+                float jv = dot(n, relative_velocity);
 
                 float beta = 0.2f;
-                float b = (beta / sub_time_step) * -depth;
+                float b = (beta / sub_time_step) * depth;
 
-                float lambda = effective_mass * -(jv + b);
+                float lambda = effective_mass * (-jv + b);
+                lambda = max(lambda, 0.0f);
+                v2 impulse = lambda * n;
 
-                collision_response.a_vel = j_va * lambda * a_inv_mass;
-                collision_response.a_angular_vel = (j_wa * lambda * a_inv_moment_of_inertia).z;
-                collision_response.b_vel = j_vb * lambda * b_inv_mass;
-                collision_response.b_angular_vel = (j_wb * lambda * b_inv_moment_of_inertia).z;
+                collision_response.a_vel = -(a_inv_mass * impulse);
+                collision_response.a_angular_vel = -(a_inv_moment_of_inertia * box2d_cross(ra, impulse));
+                collision_response.b_vel = (b_inv_mass * impulse);
+                collision_response.b_angular_vel = (b_inv_moment_of_inertia * box2d_cross(rb, impulse));
                 
             }
             
-            // Do accumulation of impluse and position correction.
             for(int collisioni = 0; collisioni < collisions.size(); collisioni++)
             {
                 Collision &collision = collisions[collisioni];
@@ -553,8 +539,6 @@ namespace Sandbox
                 collision.b_kinematics->velocity += collision_response.b_vel;
                 collision.a_kinematics->angular_velocity += collision_response.a_angular_vel;
                 collision.b_kinematics->angular_velocity += collision_response.b_angular_vel;
-                //*collision.a_center_of_mass += collision_response.a_pos;
-                //*collision.b_center_of_mass += collision_response.b_pos;
             }
 #endif
             
@@ -570,7 +554,7 @@ namespace Sandbox
         for(int i = 0; i < circle_list.geometry.size(); i++)
         {
             Circle &geometry = circle_list.geometry[i];
-            Graphics::circle(geometry.center, geometry.radius, Color::YELLOW);
+            Graphics::circle(geometry.center, geometry.radius, Color::YELLOW, 0.05f);
             Graphics::arrow(geometry.center, geometry.center + rotate_vector(v2(1.0f, 0.0f) * geometry.radius, geometry.rotation), 0.02f, v4(Color::RED));
         }
     }
