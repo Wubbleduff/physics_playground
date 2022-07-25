@@ -12,6 +12,10 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+
 using namespace GameMath;
 
 const v4 Color::RED = v4(0.8f, 0.1f, 0.0f, 1.0f);
@@ -484,7 +488,7 @@ void GraphicsState::render_quad_outline_batch(std::vector<GraphicsState::QuadOut
     use_shader(shader);
     mat4 project_m_world = Graphics::ndc_m_world();
     set_uniform(shader, "vp", project_m_world);
-    
+
     glBindVertexArray(object_buffer->vao);
     check_gl_errors("use vao");
     glBindBuffer(GL_ARRAY_BUFFER, object_buffer->vbo);
@@ -694,8 +698,6 @@ bool Graphics::init()
         reshape(instance->window, framebuffer_width, framebuffer_height);
     }
     
-    //Graphics::ImGuiImplementation::init();
-    
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
@@ -818,7 +820,7 @@ bool Graphics::init()
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, (void *)0); // Position
         glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, stride, (void *)(2 * sizeof(float))); // Radius
         glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, stride, (void *)(3 * sizeof(float))); // Color
-        glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, stride, (void *)(7 * sizeof(float) + sizeof(float))); // Thickness
+        glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, stride, (void *)(7 * sizeof(float))); // Thickness
         glEnableVertexAttribArray(0);
         glEnableVertexAttribArray(1);
         glEnableVertexAttribArray(2);
@@ -1003,7 +1005,7 @@ float Graphics::Camera::aspect_ratio()
 
 
 
-#if 0
+#if 1
 
 // ImGui Implementation
 void Graphics::ImGuiImplementation::init()
@@ -1020,13 +1022,13 @@ void Graphics::ImGuiImplementation::init()
     
     // Setup Platform/Renderer bindings
     ImGui_ImplOpenGL3_Init("#version 440 core");
-    ImGui_ImplWin32_Init(Windows::handle());
+    ImGui_ImplGlfw_InitForOpenGL(instance->window, true);
 }
 
 void Graphics::ImGuiImplementation::new_frame()
 {
     ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplWin32_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 }
 
@@ -1039,7 +1041,7 @@ void Graphics::ImGuiImplementation::end_frame()
 void Graphics::ImGuiImplementation::shutdown()
 {
     ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplWin32_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 }
 

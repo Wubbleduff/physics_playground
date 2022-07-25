@@ -1,6 +1,9 @@
 
 #include "sandbox/sandbox.h"
 #include "graphics.h"
+
+#include "imgui.h"
+
 #include <math.h>
 #include <stdlib.h>
 #include <time.h>
@@ -35,6 +38,7 @@ namespace Sandbox
     
     bool box_box(Box *a, Box *b, Collision *collision)
     {
+#if 0
         v2 a_vertices[] =
         {
             a->center - rotate_vector(a->half_extents, a->rotation), // bl
@@ -158,6 +162,7 @@ namespace Sandbox
             collision->depth = length(min_separating_normal);
         }
         
+#endif
         return true;
     }
     
@@ -197,44 +202,25 @@ namespace Sandbox
                 else if(min_diff == top_diff) normal = v2(0.0f, 1.0f);
                 else if(min_diff == bottom_diff) normal = v2(0.0f, -1.0f);
                 
-                collision->a_in_b = circle_center + normal * (min_diff - circle->radius);
-                collision->b_in_a = circle_center - normal * circle->radius;
+                collision->position = circle_center + normal * (min_diff - circle->radius);
                 
                 // Un-rotate system
-                collision->a_in_b = rotate_vector(collision->a_in_b, box->rotation);
-                collision->b_in_a = rotate_vector(collision->b_in_a, box->rotation);
+                collision->position = rotate_vector(collision->position, box->rotation);
                 collision->normal = rotate_vector(normal, box->rotation);
                 collision->depth = min_diff;
-                collision->a_in_b += box->center;
-                collision->b_in_a += box->center;
-                
-                if(EQ(collision->a_in_b, collision->b_in_a))
-                {
-                    // Contact points are exactly the same. Return no collision or else we'll have a malformed collision normal.
-                    return false;
-                }
+                collision->position += box->center;
                 
                 return true;
             }
             else
             {
                 // Center outside of box
-                collision->a_in_b = clamped;
-                collision->b_in_a = circle_center + normalize(clamped - circle_center) * circle->radius;
-                
-                collision->a_in_b = rotate_vector(collision->a_in_b, box->rotation);
-                collision->b_in_a = rotate_vector(collision->b_in_a, box->rotation);
-                collision->a_in_b += box->center;
-                collision->b_in_a += box->center;
-                
-                collision->normal = normalize(collision->a_in_b - collision->b_in_a);
-                collision->depth = length(collision->a_in_b - collision->b_in_a);
-                
-                if(EQ(collision->a_in_b, collision->b_in_a))
-                {
-                    // Contact points are exactly the same. Return no collision or else we'll have a malformed collision normal.
-                    return false;
-                }
+                collision->position = clamped;
+                collision->position = rotate_vector(collision->position, box->rotation);
+                collision->position += box->center;
+
+                collision->normal = normalize(circle->center - collision->position);
+                collision->depth = circle->radius - length(circle->center - collision->position);
                 
                 return true;
             }
@@ -266,8 +252,9 @@ namespace Sandbox
 
             collision->normal = ndiff;
             collision->depth = a->radius + b->radius - l;
-            collision->a_in_b = a->center + ndiff * a->radius;
-            collision->b_in_a = b->center - ndiff * b->radius;
+            //collision->a_in_b = a->center + ndiff * a->radius;
+            //collision->b_in_a = b->center - ndiff * b->radius;
+            collision->position = a->center + ndiff * a->radius;
             
             return true;
         }
@@ -377,6 +364,7 @@ namespace Sandbox
 #endif
         
         
+#if 1
         make_body_box(
                       Kinematics { v2(0.0f, 0.0f), 0.0f, v2(), 0.0f, 0.0f, 0.0f, true, },
                       Box { v2(0.0f, -14.0f), v2(10.0f, 10.0f), 0.0f }
@@ -393,8 +381,10 @@ namespace Sandbox
                       Kinematics { v2(0.0f, 0.0f), 0.0f, v2(), 0.0f, 0.0f, 0.0f, true, },
                       Box { v2(17.0f, 0.0f), v2(10.0f, 10.0f), 0.0f }
                       );
+#endif
     }
     
+#if 1
     void LevelSandbox::step(float time_step)
     {
         int step_count = 8;
@@ -415,7 +405,6 @@ namespace Sandbox
                 update_body(&kinematics, &geometry.center, &geometry.rotation, sub_time_step);
             }
             
-#if 1
             std::vector<Collision> collisions;
             for(int box1i = 0; box1i < box_list.geometry.size(); box1i++)
             {
@@ -487,14 +476,11 @@ namespace Sandbox
             }
             
             std::vector<CollisionResponse> collision_responses;
-            collision_responses.resize(collisions.size());
             for(int collisioni = 0; collisioni < collisions.size(); collisioni++)
             {
                 Collision &collision = collisions[collisioni];
-                CollisionResponse &collision_response = collision_responses[collisioni];
                 
-                v2 a_in_b = collision.a_in_b;
-                v2 b_in_a = collision.b_in_a;
+                v2 contact_position = collision.position;
                 
                 v2 *a_center_of_mass = collision.a_center_of_mass;
                 v2 a_velocity = collision.a_kinematics->velocity;
@@ -513,10 +499,9 @@ namespace Sandbox
                 v2 n = normalize(collision.normal);
                 assert(!EQ(n, v2()));
                 
-                v2 ra = a_in_b - *a_center_of_mass;
-                v2 rb = b_in_a - *b_center_of_mass;
+                v2 ra = contact_position - *a_center_of_mass;
+                v2 rb = contact_position - *b_center_of_mass;
                 v2 relative_velocity = -(a_velocity + box2d_cross(a_angular_velocity, ra)) + (b_velocity + box2d_cross(b_angular_velocity, rb));
-                //v2 relative_velocity = -a_velocity + b_velocity;
                 
 		float rna = dot(ra, n);
 		float rnb = dot(rb, n);
@@ -536,41 +521,63 @@ namespace Sandbox
                 lambda = max(lambda, 0.0f);
                 v2 impulse = lambda * n;
 
-                collision_response.a_vel = -(a_inv_mass * impulse);
-                collision_response.a_angular_vel = -(a_inv_moment_of_inertia * box2d_cross(ra, impulse));
-                collision_response.b_vel = (b_inv_mass * impulse);
-                collision_response.b_angular_vel = (b_inv_moment_of_inertia * box2d_cross(rb, impulse));
+                collision.a_kinematics->velocity += -(a_inv_mass * impulse);
+                collision.a_kinematics->angular_velocity += -(a_inv_moment_of_inertia * box2d_cross(ra, impulse));
+                collision.b_kinematics->velocity += (b_inv_mass * impulse);
+                collision.b_kinematics->angular_velocity += (b_inv_moment_of_inertia * box2d_cross(rb, impulse));
                 
             }
-            
-            for(int collisioni = 0; collisioni < collisions.size(); collisioni++)
-            {
-                Collision &collision = collisions[collisioni];
-                CollisionResponse &collision_response = collision_responses[collisioni];
-                
-                collision.a_kinematics->velocity += collision_response.a_vel;
-                collision.b_kinematics->velocity += collision_response.b_vel;
-                collision.a_kinematics->angular_velocity += collision_response.a_angular_vel;
-                collision.b_kinematics->angular_velocity += collision_response.b_angular_vel;
-            }
-#endif
-            
-            
         }
         
         for(int i = 0; i < box_list.geometry.size(); i++)
         {
             Box &geometry = box_list.geometry[i];
             Graphics::quad(geometry.center, geometry.half_extents, geometry.rotation, Color::BLUE);
-            Graphics::arrow(geometry.center, geometry.center + rotate_vector(geometry.half_extents, geometry.rotation), 0.02f, v4(Color::RED));
+            Graphics::arrow(geometry.center, geometry.center + rotate_vector(geometry.half_extents, geometry.rotation), 0.01f, v4(Color::RED));
         }
         for(int i = 0; i < circle_list.geometry.size(); i++)
         {
             Circle &geometry = circle_list.geometry[i];
-            Graphics::circle(geometry.center, geometry.radius, Color::YELLOW, 0.05f);
-            Graphics::arrow(geometry.center, geometry.center + rotate_vector(v2(1.0f, 0.0f) * geometry.radius, geometry.rotation), 0.02f, v4(Color::RED));
+            Graphics::circle_outline(geometry.center, geometry.radius, Color::YELLOW, 0.01f);
+            Graphics::arrow(geometry.center, geometry.center + rotate_vector(v2(1.0f, 0.0f) * geometry.radius, geometry.rotation), 0.01f, v4(Color::RED));
         }
     }
+#endif
+
+#if 0
+    void LevelSandbox::step(float time_step)
+    {
+        v2 mouse = Graphics::mouse_world_position();
+
+        ImGui::Begin("main");
+
+        ImGui::Text("Hello");
+
+        static Circle c1;
+        c1.radius = 1.0f;
+
+        static Circle c2;
+        c2.center = mouse;
+        c2.radius = 1.0f;
+
+        Graphics::circle_outline(c1.center, c1.radius, Color::WHITE, 0.02f);
+        Graphics::circle_outline(c2.center, c2.radius, Color::WHITE, 0.02f);
+
+        Collision col;
+        bool collided = circle_circle(&c1, &c2, &col);
+        if(collided)
+        {
+            Graphics::circle(col.position, 0.05f, Color::RED, 1);
+
+            v2 ra = col.position - c1.center;
+            v2 rb = col.position - c2.center;
+            Graphics::arrow(c1.center, c1.center + ra, 0.01f, Color::YELLOW);
+            Graphics::arrow(c2.center, c2.center + rb, 0.01f, Color::YELLOW);
+        }
+
+        ImGui::End();
+    }
+#endif
     
     
     void LevelSandbox::make_body_box(const Kinematics &kinematics, const Box &shape)

@@ -102,43 +102,43 @@ void main() {
     */
 
     color = v_color;
-    gl_Position = gl_in[0].gl_Position + mvp * vec4(_1, 0.0f, 0.0f);
+    gl_Position = mvp * (gl_in[0].gl_Position + vec4(_1, 0.0f, 0.0f));
     EmitVertex();
 
     color = v_color;
-    gl_Position = gl_in[0].gl_Position + mvp * vec4(_2, 0.0f, 0.0f);
+    gl_Position = mvp * (gl_in[0].gl_Position + vec4(_2, 0.0f, 0.0f));
     EmitVertex();
 
     color = v_color;
-    gl_Position = gl_in[0].gl_Position + mvp * vec4(_3, 0.0f, 0.0f);
+    gl_Position = mvp * (gl_in[0].gl_Position + vec4(_3, 0.0f, 0.0f));
     EmitVertex();
 
     color = v_color;
-    gl_Position = gl_in[0].gl_Position + mvp * vec4(_4, 0.0f, 0.0f);
+    gl_Position = mvp * (gl_in[0].gl_Position + vec4(_4, 0.0f, 0.0f));
     EmitVertex();
 
     color = v_color;
-    gl_Position = gl_in[0].gl_Position + mvp * vec4(_5, 0.0f, 0.0f);
+    gl_Position = mvp * (gl_in[0].gl_Position + vec4(_5, 0.0f, 0.0f));
     EmitVertex();
 
     color = v_color;
-    gl_Position = gl_in[0].gl_Position + mvp * vec4(_6, 0.0f, 0.0f);
+    gl_Position = mvp * (gl_in[0].gl_Position + vec4(_6, 0.0f, 0.0f));
     EmitVertex();
 
     color = v_color;
-    gl_Position = gl_in[0].gl_Position + mvp * vec4(_7, 0.0f, 0.0f);
+    gl_Position = mvp * (gl_in[0].gl_Position + vec4(_7, 0.0f, 0.0f));
     EmitVertex();
 
     color = v_color;
-    gl_Position = gl_in[0].gl_Position + mvp * vec4(_8, 0.0f, 0.0f);
+    gl_Position = mvp * (gl_in[0].gl_Position + vec4(_8, 0.0f, 0.0f));
     EmitVertex();
 
     color = v_color;
-    gl_Position = gl_in[0].gl_Position + mvp * vec4(_1, 0.0f, 0.0f);
+    gl_Position = mvp * (gl_in[0].gl_Position + vec4(_1, 0.0f, 0.0f));
     EmitVertex();
 
     color = v_color;
-    gl_Position = gl_in[0].gl_Position + mvp * vec4(_2, 0.0f, 0.0f);
+    gl_Position = mvp * (gl_in[0].gl_Position + vec4(_2, 0.0f, 0.0f));
     EmitVertex();
 
     EndPrimitive();

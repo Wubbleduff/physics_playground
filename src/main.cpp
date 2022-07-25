@@ -83,6 +83,8 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
     {
         return 1;
     }
+
+    Graphics::ImGuiImplementation::init();
     
     //set_next_level(DYNAMICS);
     //set_next_level(COLLISION_DETECTION);
@@ -112,10 +114,12 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
                 switch_level();
             }
             
+            Graphics::ImGuiImplementation::new_frame();
             level_state.level->step(STEP_TIME);
             
             Graphics::clear_frame(v4(0.0f, 0.0f, 0.05f, 1.0f));
             Graphics::render();
+            Graphics::ImGuiImplementation::end_frame();
             Graphics::swap_frames();
         }
     }
