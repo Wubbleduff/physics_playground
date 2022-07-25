@@ -29,8 +29,8 @@ namespace Sandbox
         GameMath::v2 velocity = GameMath::v2(); // m / s
         float angular_velocity = 0.0f; // rad / s
         
-        GameMath::v2 force_sum = GameMath::v2(0.0f, 0.0f);
-        float torque_sum = 0.0f;
+        GameMath::v2 acceleration_sum = GameMath::v2(0.0f, 0.0f);
+        float angular_acceleration_sum = 0.0f;
         
         float inv_mass = 1.0f; // kg
         float inv_moment_of_inertia = 1.0f; // kg * m^2 To be derived

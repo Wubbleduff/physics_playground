@@ -291,37 +291,31 @@ namespace Sandbox
     
     static void update_body(Kinematics *kinematics, v2 *position, float *rotation, float time_step)
     {
+        static const float gravity = 9.81f;
         static const float air_drag = 0.2f;
         static const float rotational_air_drag = 1.0f;
-        static const float gravity = 9.81f;
+        //static const float gravity = 0.0f;
+        //static const float air_drag = 0.0f;
+        //static const float rotational_air_drag = 0.0f;
 
         if(kinematics->is_static) return;
+
+        kinematics->acceleration_sum.y -= gravity;
         
-        v2 drag_force = 0.5f * -kinematics->velocity * air_drag;
-        kinematics->force_sum += drag_force;
-        kinematics->apply_force(v2(0.0f, -gravity * (1.0f / kinematics->inv_mass)), *position);
+        v2 drag = -kinematics->velocity * air_drag;
+        kinematics->acceleration_sum += drag;
         
-        kinematics->velocity += kinematics->acceleration_sum * time_step;
+        kinematics->velocity += kinematics->acceleration_sum * kinematics->inv_mass * time_step;
         *position += kinematics->velocity * time_step;
         
-        float angular_drag_force = -kinematics->angular_velocity * rotational_air_drag;
-        kinematics->apply_torque(angular_drag_force);
+        float angular_drag = -kinematics->angular_velocity * rotational_air_drag;
+        kinematics->angular_acceleration_sum += angular_drag;
         
-        kinematics->angular_velocity += kinematics->angular_acceleration_sum * time_step;
+        kinematics->angular_velocity += kinematics->angular_acceleration_sum * kinematics->inv_moment_of_inertia * time_step;
         *rotation += kinematics->angular_velocity * time_step;
         
         kinematics->acceleration_sum = v2();
-        kinematics->angular_acceleration_sum = 0.0;
-        
-        // If velocity is very close to zero, set it to 0.
-        if(EQ(kinematics->velocity, v2()))
-        {
-            kinematics->velocity = v2();
-        }
-        if(EQ(kinematics->angular_velocity, 0.0f))
-        {
-            kinematics->angular_velocity = 0.0f;
-        }
+        kinematics->angular_acceleration_sum = 0.0f;
     }
     
     void LevelSandbox::init()
@@ -330,17 +324,18 @@ namespace Sandbox
         
         //time_t t;
         //seed_random((unsigned)time(&t));
-        seed_random(1);
-#if 1
-        for(int i = 0; i < 50; i++)
+        seed_random(2);
+#if 0
+        for(int i = 0; i < 10; i++)
         {
             v2 position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
             v2 scale = v2(random_range(0.1f, 0.3f), random_range(0.1f, 0.3f));
             float inv_mass = 1.0f / (scale.x * scale.y);
-            float inv_moment_of_inertia = 5.0f;
+            float inv_moment_of_inertia = inv_mass;
             
-            v2 velocity = v2(random_range(-10.0f, 10.0f), random_range(-10.0f, 10.0f));
-            //float angular_velocity = random_range(-10.0f, 10.0f);
+            //v2 velocity = v2(random_range(-10.0f, 10.0f), random_range(-10.0f, 10.0f));
+            //float angular_velocity = random_range(-1000.0f, 1000.0f);
+            v2 velocity = v2();
             float angular_velocity = 0.0f;
             make_body_box(
                           Kinematics { velocity, angular_velocity, v2(), 0.0f, inv_mass, inv_moment_of_inertia, false, },
@@ -350,7 +345,7 @@ namespace Sandbox
 #endif
         
 #if 1
-        int num_circles = 50;
+        int num_circles = 300;
         for(int i = 0; i < num_circles; i++)
         {
             v2 position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
@@ -358,14 +353,27 @@ namespace Sandbox
             float inv_mass = 1.0f / (PI * radius*radius);
             float inv_moment_of_inertia = inv_mass;
 
-            v2 velocity = v2(random_range(-10.0f, 10.0f), random_range(-10.0f, 10.0f));
-            float angular_velocity = random_range(-10.0f, 10.0f);
-            //float angular_velocity = 0.0f;
+            //v2 velocity = v2(random_range(-10.0f, 10.0f), random_range(-10.0f, 10.0f));
+            //float angular_velocity = random_range(-10.0f, 10.0f);
+            v2 velocity = v2();
+            float angular_velocity = 0.0f;
             make_body_circle(
                              Kinematics { velocity, angular_velocity, v2(), 0.0f, inv_mass, inv_moment_of_inertia, false, },
                              Circle{ position, radius, 0.0f }
                              );
         }
+#endif
+
+#if 0
+        make_body_box(
+                      Kinematics { v2(0.0f, 10.0f), 0.0f, v2(), 0.0f, 10.0f, 1.0f, false, },
+                      Box { v2(2.0f, -2.0f), v2(0.2f, 1.0f), 0.0f }
+                      );
+
+        make_body_box(
+                      Kinematics { v2(0.0f, 0.0f), 0.0f, v2(), 0.0f, 10.0f, 1.0f, false, },
+                      Box { v2(1.0f, 1.0f), v2(1.0f, 0.2f), 0.0f }
+                      );
 #endif
         
         
@@ -389,7 +397,7 @@ namespace Sandbox
     
     void LevelSandbox::step(float time_step)
     {
-        int step_count = 4;
+        int step_count = 8;
         for(int step_i = 0; step_i < step_count; step_i++)
         {
             float sub_time_step = time_step / step_count;
@@ -424,6 +432,7 @@ namespace Sandbox
                     }
                     
                     Collision c;
+
                     bool collided = box_box(box1, box2, &c);
                     if(collided)
                     {
@@ -507,6 +516,7 @@ namespace Sandbox
                 v2 ra = a_in_b - *a_center_of_mass;
                 v2 rb = b_in_a - *b_center_of_mass;
                 v2 relative_velocity = -(a_velocity + box2d_cross(a_angular_velocity, ra)) + (b_velocity + box2d_cross(b_angular_velocity, rb));
+                //v2 relative_velocity = -a_velocity + b_velocity;
                 
 		float rna = dot(ra, n);
 		float rnb = dot(rb, n);
@@ -516,8 +526,11 @@ namespace Sandbox
 
                 float jv = dot(n, relative_velocity);
 
-                float beta = 0.2f;
-                float b = (beta / sub_time_step) * depth;
+                static const float beta = -0.2f;
+                static const float minimum_depth = 0.01f;
+
+                //float b = (beta / sub_time_step) * min(0.0f, depth);
+                float b = (beta / sub_time_step) * min(0.0f, -depth + minimum_depth);
 
                 float lambda = effective_mass * (-jv + b);
                 lambda = max(lambda, 0.0f);
