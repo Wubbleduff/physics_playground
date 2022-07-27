@@ -67,6 +67,19 @@ namespace GameMath
         v4(v3 v, float a)          : x(v.x), y(v.y), z(v.z), w(a)   { }
         v4(float a, v3 v)          : x(a),   y(v.x), z(v.y), w(v.z) { }
     };
+
+    struct v2i
+    {
+        union
+        {
+            struct { int x, y; };
+            int v[2];
+        };
+        int operator[](unsigned i) const
+        {
+            return v[i];
+        }
+    };
     
     
     

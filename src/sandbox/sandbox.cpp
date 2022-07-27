@@ -38,131 +38,97 @@ namespace Sandbox
     
     bool box_box(Box *a, Box *b, Collision *collision)
     {
-#if 0
-        v2 a_vertices[] =
+        v2 vertices[] =
         {
             a->center - rotate_vector(a->half_extents, a->rotation), // bl
             a->center + rotate_vector(v2(a->half_extents.x, -a->half_extents.y), a->rotation), // br
             a->center + rotate_vector(a->half_extents, a->rotation), // tr
             a->center + rotate_vector(v2(-a->half_extents.x, a->half_extents.y), a->rotation), // tl
-        };
-        v2 b_vertices[] =
-        {
+
             b->center - rotate_vector(b->half_extents, b->rotation), // bl
             b->center + rotate_vector(v2(b->half_extents.x, -b->half_extents.y), b->rotation), // br
             b->center + rotate_vector(b->half_extents, b->rotation), // tr
             b->center + rotate_vector(v2(-b->half_extents.x, b->half_extents.y), b->rotation), // tl
         };
+        v2 *v_start = &(vertices[0]);
         
-        // SAT to collide.
-        // We may early out here.
-        v2 *v_pairs[2][2] = {
-            {&(a_vertices[0]), &(b_vertices[0])},
-            {&(b_vertices[0]), &(a_vertices[0])}
-        };
-        // Check A against B and B against A.
-        for(int pair_index = 0; pair_index < 2; pair_index++)
-        {
-            v2 *i_vertices = v_pairs[pair_index][0];
-            v2 *j_vertices = v_pairs[pair_index][1];
-            
-            // Loop through each plane for the first shape.
-            for(int i = 0; i < 4; i++)
-            {
-                v2 i_plane = i_vertices[(i + 1) % 4] - i_vertices[i];
-                
-                // Since this is a OBB, we know the min and max of the first shape
-                // is just the 2 vertices we picked for the current edge axis.
-                float min_i = 0.0f;
-                float max_i = dot(i_plane, i_plane);
-                
-                // Find min and max of second shape.
-                float min_j = INFINITY;
-                float max_j = -INFINITY;
-                for(int j = 0; j < 4; j++)
-                {
-                    float j_vertex_measured_along_i_plane = dot(i_plane, j_vertices[j] - i_vertices[i]);
-                    min_j = min(min_j, j_vertex_measured_along_i_plane);
-                    max_j = max(max_j, j_vertex_measured_along_i_plane);
-                }
-                
-                // If there's no overlap, there' can't be a collision.
-                if(min_i > max_j || max_i < min_j) return false;
-            }
-            
-        }
-        
-        // From this point forward, the boxes are assumed to be colliding.
-        // Given the boxes are colliding:
-        // Find the minimum separating normal for the collision.
-        
-        v2 min_separating_normal = v2();
-        v2 min_contact_points[2] = {v2(), v2()};
-        bool resolve_as_a_in_b = false; // Used for the orientation of the collision.
-        bool initial_check = true; // Used for always using the first separation normal check when finding minimum.
+        v2i reference_edge; // Edge with minimum separating axis.
+        v2i incident_edge;  // Edge with potential contact vertices.
+        float min_pen = INFINITY;
         
         // Check A against B and B against A.
+        v2 *index_pairs[2][2] = {{v_start, v_start + 4}, {v_start + 4, v_start}};
         for(int pair_index = 0; pair_index < 2; pair_index++)
         {
-            v2 *i_vertices = v_pairs[pair_index][0];
-            v2 *j_vertices = v_pairs[pair_index][1];
+            v2 *i_vertices = index_pairs[pair_index][0];
+            v2 *j_vertices = index_pairs[pair_index][1];
             
             // Loop through edges of the first shape.
             for(int i = 0; i < 4; i++)
             {
-                v2 i_normal = -find_ccw_normal(i_vertices[(i + 1) % 4] - i_vertices[i]);
+                v2 i_n = -find_ccw_normal(i_vertices[(i + 1) % 4] - i_vertices[i]);
                 
                 // Find the maximum penetration of the second shape's vertices. We can
                 // only resolve the collision if we use the vertex that's deepest in the
                 // first shape's edges.
-                float max_pen = 0.0f;
-                int max_pen_index = 0;
+                float max_j_pen = 0.0f;
+                int max_j_pen_index = 0;
                 for(int j = 0; j < 4; j++)
                 {
-                    float j_vertex_pen_depth = dot(i_normal, j_vertices[j] - i_vertices[i]);
-                    if(j_vertex_pen_depth < max_pen)
+                    float j_pen = -dot(i_n, j_vertices[j] - i_vertices[i]);
+                    if(j_pen > max_j_pen)
                     {
-                        max_pen = j_vertex_pen_depth;
-                        max_pen_index = j;
+                        max_j_pen = j_pen;
+                        max_j_pen_index = j;
                     }
                 }
                 
                 // Check if this separation is the best (minimum) separation so far.
-                float j_pen_depth = GameMath::abs(signed_distance_to_plane(j_vertices[max_pen_index], i_vertices[i], i_normal));
-                if(initial_check || (j_pen_depth < length(min_separating_normal)))
+                float pen = -signed_distance_to_plane(j_vertices[max_j_pen_index], i_vertices[i], i_n);
+
+                // Can early out here. Negative penetration between 2 boxes necessarily means they're not colliding.
+                if(pen < 0.0f)
                 {
-                    min_separating_normal = normalize(i_normal) * j_pen_depth;
-                    min_contact_points[0] = j_vertices[max_pen_index];
-                    min_contact_points[1] = min_contact_points[0] + min_separating_normal;
-                    resolve_as_a_in_b = (bool)pair_index;
-                    initial_check = false;
+                    return false;
+                }
+
+                if(pen < min_pen)
+                {
+                    reference_edge = {(int)(&(i_vertices[i]) - v_start), (int)(&(i_vertices[(i + 1) % 4]) - v_start)};
+                    int j = max_j_pen_index;
+                    int j_prev = (j == 0) ? 3 : j - 1;
+                    int j_next = (j + 1) % 4;
+
+                    float j_prev_d = dot(j_vertices[j_prev] - i_vertices[i], i_n);
+                    float j_next_d = dot(j_vertices[j_next] - i_vertices[i], i_n);
+                    if(j_prev_d < j_next_d)
+                    {
+                        incident_edge = {(int)(&(j_vertices[j_prev]) - v_start), (int)(&(j_vertices[j]) - v_start)};
+                    }
+                    else
+                    {
+                        incident_edge = {(int)(&(j_vertices[j]) - v_start), (int)(&(j_vertices[j_next]) - v_start)};
+                    }
+
+                    min_pen = pen;
                 }
             }
         }
-        
-        // If the contact points are approximately equal, treat this as no collision.
-        if(EQ(min_contact_points[0], min_contact_points[1]))
-        {
-            return false;
-        }
-        
-        // Check for the orientation of the collision.
-        if(resolve_as_a_in_b)
-        {
-            collision->a_in_b = min_contact_points[0];
-            collision->b_in_a = min_contact_points[1];
-            collision->normal = -normalize(min_separating_normal);
-            collision->depth = length(min_separating_normal);
-        }
-        else
-        {
-            collision->b_in_a = min_contact_points[0];
-            collision->a_in_b = min_contact_points[1];
-            collision->normal = normalize(min_separating_normal);
-            collision->depth = length(min_separating_normal);
-        }
-        
-#endif
+
+        v2 ref_base = (vertices[reference_edge[0]] + vertices[reference_edge[1]]) * 0.5f;
+        Graphics::arrow(ref_base, ref_base + find_ccw_normal(vertices[reference_edge[0]] - vertices[reference_edge[1]]), 0.01f, Color::WHITE);
+
+        v2 inc_base = (vertices[incident_edge[0]] + vertices[incident_edge[1]]) * 0.5f;
+        Graphics::arrow(inc_base, inc_base + find_ccw_normal(vertices[incident_edge[0]] - vertices[incident_edge[1]]), 0.01f, Color::RED);
+        ImGui::Text("min_pen %f", min_pen);
+        ImGui::Text("ref (%i, %i)", reference_edge[0], reference_edge[1]);
+        ImGui::Text("inc (%i, %i)", incident_edge[0], incident_edge[1]);
+
+        collision->contacts[0].position = vertices[incident_edge[0]];
+        collision->num_contacts++;
+        collision->contacts[1].position = vertices[incident_edge[1]];
+        collision->num_contacts++;
+
         return true;
     }
     
@@ -384,7 +350,7 @@ namespace Sandbox
 #endif
     }
     
-#if 1
+#if 0
     void LevelSandbox::step(float time_step)
     {
         int step_count = 8;
@@ -514,7 +480,6 @@ namespace Sandbox
                 static const float beta = -0.2f;
                 static const float minimum_depth = 0.01f;
 
-                //float b = (beta / sub_time_step) * min(0.0f, depth);
                 float b = (beta / sub_time_step) * min(0.0f, -depth + minimum_depth);
 
                 float lambda = effective_mass * (-jv + b);
@@ -525,7 +490,6 @@ namespace Sandbox
                 collision.a_kinematics->angular_velocity += -(a_inv_moment_of_inertia * box2d_cross(ra, impulse));
                 collision.b_kinematics->velocity += (b_inv_mass * impulse);
                 collision.b_kinematics->angular_velocity += (b_inv_moment_of_inertia * box2d_cross(rb, impulse));
-                
             }
         }
         
@@ -542,9 +506,7 @@ namespace Sandbox
             Graphics::arrow(geometry.center, geometry.center + rotate_vector(v2(1.0f, 0.0f) * geometry.radius, geometry.rotation), 0.01f, v4(Color::RED));
         }
     }
-#endif
-
-#if 0
+#else
     void LevelSandbox::step(float time_step)
     {
         v2 mouse = Graphics::mouse_world_position();
@@ -553,26 +515,28 @@ namespace Sandbox
 
         ImGui::Text("Hello");
 
-        static Circle c1;
-        c1.radius = 1.0f;
+        static Box b1 = {};
+        b1.half_extents = v2(1.0f, 1.0f);
+        static float r = 0.0f;
+        r += time_step * 0.1f;
+        b1.rotation = r;
 
-        static Circle c2;
-        c2.center = mouse;
-        c2.radius = 1.0f;
+        static Box b2 = {};
+        b2.center = mouse;
+        b2.half_extents = v2(1.0f, 1.0f);
 
-        Graphics::circle_outline(c1.center, c1.radius, Color::WHITE, 0.02f);
-        Graphics::circle_outline(c2.center, c2.radius, Color::WHITE, 0.02f);
+        Graphics::quad_outline(b1.center, b1.half_extents, b1.rotation, Color::WHITE, 0.02f);
+        Graphics::quad_outline(b2.center, b2.half_extents, b2.rotation, Color::WHITE, 0.02f);
 
         Collision col;
-        bool collided = circle_circle(&c1, &c2, &col);
+        bool collided = box_box(&b1, &b2, &col);
         if(collided)
         {
-            Graphics::circle(col.position, 0.05f, Color::RED, 1);
+            v2 c_0 = col.contacts[0].position;
+            v2 c_1 = col.contacts[1].position;
 
-            v2 ra = col.position - c1.center;
-            v2 rb = col.position - c2.center;
-            Graphics::arrow(c1.center, c1.center + ra, 0.01f, Color::YELLOW);
-            Graphics::arrow(c2.center, c2.center + rb, 0.01f, Color::YELLOW);
+            Graphics::circle(c_0, 0.05f, Color::RED, 1);
+            Graphics::circle(c_1, 0.05f, Color::RED, 1);
         }
 
         ImGui::End();

@@ -4,6 +4,7 @@
 #include "level_base.h"
 #include "game_math.h"
 
+#include <cstdint>
 #include <vector>
 
 
@@ -37,9 +38,19 @@ namespace Sandbox
         
         bool is_static = false;
     };
+
+    struct Contact
+    {
+        float depth;
+        GameMath::v2 normal;
+        GameMath::v2 position;
+    };
     
     struct Collision
     {
+        uint32_t num_contacts;
+        Contact contacts[2];
+
         float depth;
         GameMath::v2 normal;
         GameMath::v2 position;
