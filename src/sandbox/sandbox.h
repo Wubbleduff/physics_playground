@@ -41,7 +41,7 @@ namespace Sandbox
 
     struct Contact
     {
-        float depth;
+        float pen;
         GameMath::v2 normal;
         GameMath::v2 position;
     };
@@ -51,10 +51,6 @@ namespace Sandbox
         uint32_t num_contacts;
         Contact contacts[2];
 
-        float depth;
-        GameMath::v2 normal;
-        GameMath::v2 position;
-        
         Kinematics *a_kinematics;
         Kinematics *b_kinematics;
         GameMath::v2 *a_center_of_mass;

@@ -35,6 +35,24 @@ namespace Sandbox
     {
         return (GameMath::abs(a.x - b.x) < EPSILON) && (GameMath::abs(a.y - b.y) < EPSILON);
     }
+
+    // n assumed to be normalized.
+    v2 clip_line_to_plane(v2 v0, v2 v1, v2 p, v2 n)
+    {
+        float v0n = dot(v0 - p, n);
+        float v1n = dot(v1 - p, n);
+        if(v0n > 0.0f && v1n > 0.0f)
+        {
+            return (v0n < v1n) ? v0 : v1;
+        }
+        if(v0n < 0.0f && v1n < 0.0f)
+        {
+            return (v0n > v1n) ? v0 : v1;
+        }
+
+        float ratio = v0n / (v0n + (-v1n));
+        return v0 + (v1 - v0) * ratio;
+    }
     
     bool box_box(Box *a, Box *b, Collision *collision)
     {
@@ -115,19 +133,36 @@ namespace Sandbox
             }
         }
 
+        v2 normal = find_ccw_normal(vertices[reference_edge[0]] - vertices[reference_edge[1]]);
+
+        v2 c0 = clip_line_to_plane(vertices[incident_edge[0]], vertices[incident_edge[1]], vertices[reference_edge[0]], normalize(find_ccw_normal(normal)));
+        v2 c1 = clip_line_to_plane(vertices[incident_edge[1]], vertices[incident_edge[0]], vertices[reference_edge[1]], normalize(-find_ccw_normal(normal)));
+
+        collision->num_contacts = 0;
+        float c0_pen = -signed_distance_to_plane(c0, vertices[reference_edge[0]], normal);
+        float c1_pen = -signed_distance_to_plane(c1, vertices[reference_edge[0]], normal);
+        if(c0_pen > 0.0f)
+        {
+            collision->contacts[collision->num_contacts].position = c0;
+            collision->contacts[collision->num_contacts].pen = c0_pen;
+            collision->contacts[collision->num_contacts].normal = normal;
+            collision->num_contacts++;
+        }
+        if(c1_pen > 0.0f)
+        {
+            collision->contacts[collision->num_contacts].position = c1;
+            collision->contacts[collision->num_contacts].pen = c1_pen;
+            collision->contacts[collision->num_contacts].normal = normal;
+            collision->num_contacts++;
+        }
+
+#if 0
         v2 ref_base = (vertices[reference_edge[0]] + vertices[reference_edge[1]]) * 0.5f;
         Graphics::arrow(ref_base, ref_base + find_ccw_normal(vertices[reference_edge[0]] - vertices[reference_edge[1]]), 0.01f, Color::WHITE);
 
         v2 inc_base = (vertices[incident_edge[0]] + vertices[incident_edge[1]]) * 0.5f;
         Graphics::arrow(inc_base, inc_base + find_ccw_normal(vertices[incident_edge[0]] - vertices[incident_edge[1]]), 0.01f, Color::RED);
-        ImGui::Text("min_pen %f", min_pen);
-        ImGui::Text("ref (%i, %i)", reference_edge[0], reference_edge[1]);
-        ImGui::Text("inc (%i, %i)", incident_edge[0], incident_edge[1]);
-
-        collision->contacts[0].position = vertices[incident_edge[0]];
-        collision->num_contacts++;
-        collision->contacts[1].position = vertices[incident_edge[1]];
-        collision->num_contacts++;
+#endif
 
         return true;
     }
@@ -168,25 +203,27 @@ namespace Sandbox
                 else if(min_diff == top_diff) normal = v2(0.0f, 1.0f);
                 else if(min_diff == bottom_diff) normal = v2(0.0f, -1.0f);
                 
-                collision->position = circle_center + normal * (min_diff - circle->radius);
+                collision->num_contacts = 1;
+                collision->contacts[0].position = circle_center + normal * (min_diff - circle->radius);
                 
                 // Un-rotate system
-                collision->position = rotate_vector(collision->position, box->rotation);
-                collision->normal = rotate_vector(normal, box->rotation);
-                collision->depth = min_diff;
-                collision->position += box->center;
+                collision->contacts[0].position = rotate_vector(collision->contacts[0].position, box->rotation);
+                collision->contacts[0].normal = rotate_vector(normal, box->rotation);
+                collision->contacts[0].pen = min_diff;
+                collision->contacts[0].position += box->center;
                 
                 return true;
             }
             else
             {
                 // Center outside of box
-                collision->position = clamped;
-                collision->position = rotate_vector(collision->position, box->rotation);
-                collision->position += box->center;
+                collision->num_contacts = 1;
+                collision->contacts[0].position = clamped;
+                collision->contacts[0].position = rotate_vector(collision->contacts[0].position, box->rotation);
+                collision->contacts[0].position += box->center;
 
-                collision->normal = normalize(circle->center - collision->position);
-                collision->depth = circle->radius - length(circle->center - collision->position);
+                collision->contacts[0].normal = normalize(circle->center - collision->contacts[0].position);
+                collision->contacts[0].pen = circle->radius - length(circle->center - collision->contacts[0].position);
                 
                 return true;
             }
@@ -216,11 +253,10 @@ namespace Sandbox
             
             v2 ndiff = normalize(diff);
 
-            collision->normal = ndiff;
-            collision->depth = a->radius + b->radius - l;
-            //collision->a_in_b = a->center + ndiff * a->radius;
-            //collision->b_in_a = b->center - ndiff * b->radius;
-            collision->position = a->center + ndiff * a->radius;
+            collision->num_contacts = 1;
+            collision->contacts[0].normal = ndiff;
+            collision->contacts[0].pen = a->radius + b->radius - l;
+            collision->contacts[0].position = a->center + ndiff * a->radius;
             
             return true;
         }
@@ -278,7 +314,7 @@ namespace Sandbox
         //time_t t;
         //seed_random((unsigned)time(&t));
         seed_random(2);
-#if 0
+#if 1
         for(int i = 0; i < 10; i++)
         {
             v2 position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
@@ -287,9 +323,9 @@ namespace Sandbox
             float inv_moment_of_inertia = inv_mass;
             
             //v2 velocity = v2(random_range(-10.0f, 10.0f), random_range(-10.0f, 10.0f));
-            //float angular_velocity = random_range(-1000.0f, 1000.0f);
+            float angular_velocity = random_range(-1.0f, 1.0f);
             v2 velocity = v2();
-            float angular_velocity = 0.0f;
+            //float angular_velocity = 0.0f;
             make_body_box(
                           Kinematics { velocity, angular_velocity, v2(), 0.0f, inv_mass, inv_moment_of_inertia, false, },
                           Box { position, scale, 0.0f }
@@ -297,7 +333,7 @@ namespace Sandbox
         }
 #endif
         
-#if 1
+#if 0
         int num_circles = 300;
         for(int i = 0; i < num_circles; i++)
         {
@@ -350,7 +386,7 @@ namespace Sandbox
 #endif
     }
     
-#if 0
+#if 1
     void LevelSandbox::step(float time_step)
     {
         int step_count = 8;
@@ -396,7 +432,6 @@ namespace Sandbox
                         c.a_center_of_mass = &(box_list.geometry[box1i].center);
                         c.b_center_of_mass = &(box_list.geometry[box2i].center);
                         collisions.push_back(c);
-                        assert(!EQ(c.normal, v2()));
                     }
                 }
             }
@@ -416,7 +451,6 @@ namespace Sandbox
                         c.a_center_of_mass = &(box_list.geometry[boxi].center);
                         c.b_center_of_mass = &(circle_list.geometry[circlei].center);
                         collisions.push_back(c);
-                        assert(!EQ(c.normal, v2()));
                     }
                 }
             }
@@ -436,7 +470,6 @@ namespace Sandbox
                         c.a_center_of_mass = &(circle_list.geometry[circle1i].center);
                         c.b_center_of_mass = &(circle_list.geometry[circle2i].center);
                         collisions.push_back(c);
-                        assert(!EQ(c.normal, v2()));
                     }
                 }
             }
@@ -445,51 +478,51 @@ namespace Sandbox
             for(int collisioni = 0; collisioni < collisions.size(); collisioni++)
             {
                 Collision &collision = collisions[collisioni];
-                
-                v2 contact_position = collision.position;
-                
-                v2 *a_center_of_mass = collision.a_center_of_mass;
-                v2 a_velocity = collision.a_kinematics->velocity;
-                float a_angular_velocity = collision.a_kinematics->angular_velocity;
-                float a_inv_mass = collision.a_kinematics->inv_mass;
-                float a_inv_moment_of_inertia = collision.a_kinematics->inv_moment_of_inertia;
-                
-                v2 *b_center_of_mass = collision.b_center_of_mass;
-                v2 b_velocity = collision.b_kinematics->velocity;
-                float b_angular_velocity = collision.b_kinematics->angular_velocity;
-                float b_inv_mass = collision.b_kinematics->inv_mass;
-                float b_inv_moment_of_inertia = collision.b_kinematics->inv_moment_of_inertia;
+                for(int contact_index = 0; contact_index < collision.num_contacts; contact_index++)
+                {
+                    v2 *a_center_of_mass = collision.a_center_of_mass;
+                    v2 a_velocity = collision.a_kinematics->velocity;
+                    float a_angular_velocity = collision.a_kinematics->angular_velocity;
+                    float a_inv_mass = collision.a_kinematics->inv_mass;
+                    float a_inv_moment_of_inertia = collision.a_kinematics->inv_moment_of_inertia;
+                    
+                    v2 *b_center_of_mass = collision.b_center_of_mass;
+                    v2 b_velocity = collision.b_kinematics->velocity;
+                    float b_angular_velocity = collision.b_kinematics->angular_velocity;
+                    float b_inv_mass = collision.b_kinematics->inv_mass;
+                    float b_inv_moment_of_inertia = collision.b_kinematics->inv_moment_of_inertia;
 
-                float depth = collision.depth;
-                
-                v2 n = normalize(collision.normal);
-                assert(!EQ(n, v2()));
-                
-                v2 ra = contact_position - *a_center_of_mass;
-                v2 rb = contact_position - *b_center_of_mass;
-                v2 relative_velocity = -(a_velocity + box2d_cross(a_angular_velocity, ra)) + (b_velocity + box2d_cross(b_angular_velocity, rb));
-                
-		float rna = dot(ra, n);
-		float rnb = dot(rb, n);
-		float k_normal = a_inv_mass + b_inv_mass;
-		k_normal += a_inv_moment_of_inertia * (dot(ra, ra) - rna * rna) + b_inv_moment_of_inertia * (dot(rb, rb) - rnb * rnb);
-		float effective_mass = 1.0f / k_normal;
+                    float pen = collision.contacts[contact_index].pen;
+                    assert(!EQ(collision.contacts[contact_index].normal, v2()));
+                    v2 n = normalize(collision.contacts[contact_index].normal);
+                    v2 contact_position = collision.contacts[contact_index].position;
+                    
+                    v2 ra = contact_position - *a_center_of_mass;
+                    v2 rb = contact_position - *b_center_of_mass;
+                    v2 relative_velocity = -(a_velocity + box2d_cross(a_angular_velocity, ra)) + (b_velocity + box2d_cross(b_angular_velocity, rb));
+                    
+                    float rna = dot(ra, n);
+                    float rnb = dot(rb, n);
+                    float k_normal = a_inv_mass + b_inv_mass;
+                    k_normal += a_inv_moment_of_inertia * (dot(ra, ra) - rna * rna) + b_inv_moment_of_inertia * (dot(rb, rb) - rnb * rnb);
+                    float effective_mass = 1.0f / k_normal;
 
-                float jv = dot(n, relative_velocity);
+                    float jv = dot(n, relative_velocity);
 
-                static const float beta = -0.2f;
-                static const float minimum_depth = 0.01f;
+                    static const float beta = -0.2f;
+                    static const float minimum_pen = 0.01f;
 
-                float b = (beta / sub_time_step) * min(0.0f, -depth + minimum_depth);
+                    float b = (beta / sub_time_step) * min(0.0f, -pen + minimum_pen);
 
-                float lambda = effective_mass * (-jv + b);
-                lambda = max(lambda, 0.0f);
-                v2 impulse = lambda * n;
+                    float lambda = effective_mass * (-jv + b);
+                    lambda = max(lambda, 0.0f);
+                    v2 impulse = lambda * n;
 
-                collision.a_kinematics->velocity += -(a_inv_mass * impulse);
-                collision.a_kinematics->angular_velocity += -(a_inv_moment_of_inertia * box2d_cross(ra, impulse));
-                collision.b_kinematics->velocity += (b_inv_mass * impulse);
-                collision.b_kinematics->angular_velocity += (b_inv_moment_of_inertia * box2d_cross(rb, impulse));
+                    collision.a_kinematics->velocity += -(a_inv_mass * impulse);
+                    collision.a_kinematics->angular_velocity += -(a_inv_moment_of_inertia * box2d_cross(ra, impulse));
+                    collision.b_kinematics->velocity += (b_inv_mass * impulse);
+                    collision.b_kinematics->angular_velocity += (b_inv_moment_of_inertia * box2d_cross(rb, impulse));
+                }
             }
         }
         
@@ -532,11 +565,12 @@ namespace Sandbox
         bool collided = box_box(&b1, &b2, &col);
         if(collided)
         {
-            v2 c_0 = col.contacts[0].position;
-            v2 c_1 = col.contacts[1].position;
-
-            Graphics::circle(c_0, 0.05f, Color::RED, 1);
-            Graphics::circle(c_1, 0.05f, Color::RED, 1);
+            for(int i = 0; i < col.num_contacts; i++)
+            {
+                Graphics::circle(col.contacts[i].position, 0.05f, Color::RED, 1);
+                ImGui::Text("pen c%i %f", i, col.contacts[i].pen);
+                ImGui::Text("    n (%f, %f)", col.contacts[i].normal.x, col.contacts[i].normal.y);
+            }
         }
 
         ImGui::End();
