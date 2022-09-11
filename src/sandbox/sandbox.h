@@ -50,6 +50,7 @@ namespace Sandbox
     {
         uint32_t num_contacts;
         Contact contacts[2];
+        bool body_containing_reference_edge;
 
         Kinematics *a_kinematics;
         Kinematics *b_kinematics;
@@ -68,6 +69,8 @@ namespace Sandbox
         
         void make_body_box(const Kinematics &body, const Box &shape);
         void make_body_circle(const Kinematics &body, const Circle &shape);
+
+        std::vector<Collision> last_collisions;
         
         struct BoxList
         {
