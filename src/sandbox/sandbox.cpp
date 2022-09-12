@@ -336,7 +336,7 @@ namespace Sandbox
             v2 scale = v2(random_range(0.1f, 0.3f), random_range(0.1f, 0.3f));
 #if 1
             float mass = scale.x + scale.y;
-            float moment_of_inertia = mass * (scale.x * scale.x + scale.y * scale.y) / 12.0f; // TODO: Scale may be double here?
+            float moment_of_inertia = mass * (scale.x * scale.x + scale.y * scale.y) / 12.0f;
 #else
             float mass = 1.0f;
             float moment_of_inertia = 1.0f;
@@ -360,9 +360,11 @@ namespace Sandbox
         for(int i = 0; i < num_circles; i++)
         {
             v2 position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
-            float radius = random_range(0.1f, 0.3f);
-            float inv_mass = 1.0f / (PI * radius*radius);
-            float inv_moment_of_inertia = 1.0f;
+            float r = random_range(0.1f, 0.3f);
+            float mass = PI * r*r;
+            float moment_of_inertia = (PI * r*r*r*r) * (1.0f / 4.0f);
+            float inv_mass = 1.0f/mass;
+            float inv_moment_of_inertia= 1.0f/moment_of_inertia;
 
             //v2 velocity = v2(random_range(-10.0f, 10.0f), random_range(-10.0f, 10.0f));
             //float angular_velocity = random_range(-10.0f, 10.0f);
@@ -370,7 +372,7 @@ namespace Sandbox
             float angular_velocity = 0.0f;
             make_body_circle(
                              Kinematics { velocity, angular_velocity, v2(), 0.0f, inv_mass, inv_moment_of_inertia, false, },
-                             Circle{ position, radius, 0.0f }
+                             Circle{ position, r, 0.0f }
                              );
         }
 #endif
@@ -427,6 +429,14 @@ namespace Sandbox
                       Box { v2( 2.0f, 0.0f), scale, 0.4f }
                       );
 #endif
+
+// Circle spinning on landing
+#if 0
+        make_body_circle(
+                      Kinematics { v2(0.0f, 0.0f), 10.0f, v2(), 0.0f, 1.0f, 10.0f, false, },
+                      Circle { v2(0.0f, 0.0f), 1.0f, 0.0f }
+                      );
+#endif
         
         
 #if 1
@@ -449,7 +459,6 @@ namespace Sandbox
 #endif
     }
     
-#if 1
     void LevelSandbox::step(float time_step)
     {
         if(ImGui::Button("Reset"))
@@ -458,6 +467,7 @@ namespace Sandbox
             return;
         }
 
+#if 0
         v2 mouse = Graphics::mouse_world_position();
         static v2 lm = mouse;
         {
@@ -467,6 +477,7 @@ namespace Sandbox
             k->velocity = mouse - lm;
         }
         lm = mouse;
+#endif
 
         static float time_scale = 1.0f;
         ImGui::InputFloat("Time scale", &time_scale, 0.1f);
@@ -604,21 +615,21 @@ namespace Sandbox
                     v2 ra = contact_position - a_center_of_mass;
                     v2 rb = contact_position - b_center_of_mass;
                     v2 relative_velocity = -(a->velocity + box2d_cross(a->angular_velocity, ra)) + (b->velocity + box2d_cross(b->angular_velocity, rb));
-                    
-                    float rna = dot(ra, n);
-                    float rnb = dot(rb, n);
-                    float k_normal = a->inv_mass + b->inv_mass;
-                    k_normal += a->inv_moment_of_inertia * (dot(ra, ra) - rna * rna) + b->inv_moment_of_inertia * (dot(rb, rb) - rnb * rnb);
-                    float effective_mass = 1.0f / k_normal;
 
-                    float jv = dot(n, relative_velocity);
+                    float vn = dot(n, relative_velocity);
 
                     static const float beta_coeff = -0.4f;
                     static const float minimum_pen = 0.01f;
 
                     float beta = (beta_coeff / sub_time_step) * min(0.0f, -pen + minimum_pen);
 
-                    float lambda = effective_mass * (-jv + beta);
+                    float rna = dot(ra, n);
+                    float rnb = dot(rb, n);
+                    float k_normal = a->inv_mass + b->inv_mass;
+                    k_normal += a->inv_moment_of_inertia * (dot(ra, ra) - rna * rna) + b->inv_moment_of_inertia * (dot(rb, rb) - rnb * rnb);
+                    float effective_mass = 1.0f / k_normal;
+
+                    float lambda = effective_mass * (-vn + beta);
                     lambda = max(lambda, 0.0f);
                     v2 impulse = lambda * n;
 
@@ -626,65 +637,34 @@ namespace Sandbox
                     a->angular_velocity += -(a->inv_moment_of_inertia * box2d_cross(ra, impulse));
                     b->velocity += (b->inv_mass * impulse);
                     b->angular_velocity += (b->inv_moment_of_inertia * box2d_cross(rb, impulse));
+
+                    // Friction
+                    v2 tangent = v2(n.y, -n.x);
+                    relative_velocity = -(a->velocity + box2d_cross(a->angular_velocity, ra)) + (b->velocity + box2d_cross(b->angular_velocity, rb));
+
+                    float vt = dot(tangent, relative_velocity);
+
+                    float rta = dot(ra, tangent);
+                    float rtb = dot(rb, tangent);
+                    float k_tangent = a->inv_mass + b->inv_mass;
+                    k_tangent += a->inv_moment_of_inertia * (dot(ra, ra) - rta * rta) + b->inv_moment_of_inertia * (dot(rb, rb) - rtb * rtb);
+                    float mass_tangent = 1.0f / k_tangent;
+                    float dpt = mass_tangent * -vt;
+
+                    const static float friction = 0.1f;
+                    float maxPt = friction * lambda;
+                    dpt = clamp(dpt, -maxPt, maxPt);
+                    v2 friction_impulse = dpt * tangent;
+
+                    a->velocity += -(a->inv_mass * friction_impulse);
+                    a->angular_velocity += -(a->inv_moment_of_inertia * box2d_cross(ra, friction_impulse));
+                    b->velocity += (b->inv_mass * friction_impulse);
+                    b->angular_velocity += (b->inv_moment_of_inertia * box2d_cross(rb, friction_impulse));
                 }
             }
             last_collisions = collisions;
         }
 
-        // DEBUG
-#if 0
-        for(const Collision& collision : last_collisions)
-        {
-            for(int contact_index = 0; contact_index < collision.num_contacts; contact_index++)
-            {
-                v2 *a_center_of_mass = collision.a_center_of_mass;
-                v2 a_velocity = collision.a_kinematics->velocity;
-                float a_angular_velocity = collision.a_kinematics->angular_velocity;
-                float a_inv_mass = collision.a_kinematics->inv_mass;
-                float a_inv_moment_of_inertia = collision.a_kinematics->inv_moment_of_inertia;
-                
-                v2 *b_center_of_mass = collision.b_center_of_mass;
-                v2 b_velocity = collision.b_kinematics->velocity;
-                float b_angular_velocity = collision.b_kinematics->angular_velocity;
-                float b_inv_mass = collision.b_kinematics->inv_mass;
-                float b_inv_moment_of_inertia = collision.b_kinematics->inv_moment_of_inertia;
-
-                float pen = collision.contacts[contact_index].pen;
-                assert(!EQ(collision.contacts[contact_index].normal, v2()));
-                v2 n = normalize(collision.contacts[contact_index].normal);
-                v2 contact_position = collision.contacts[contact_index].position;
-                
-                v2 ra = contact_position - *a_center_of_mass;
-                v2 rb = contact_position - *b_center_of_mass;
-                v2 relative_velocity = -(a_velocity + box2d_cross(a_angular_velocity, ra)) + (b_velocity + box2d_cross(b_angular_velocity, rb));
-                
-                float rna = dot(ra, n);
-                float rnb = dot(rb, n);
-                float k_normal = a_inv_mass + b_inv_mass;
-                k_normal += a_inv_moment_of_inertia * (dot(ra, ra) - rna * rna) + b_inv_moment_of_inertia * (dot(rb, rb) - rnb * rnb);
-                float effective_mass = 1.0f / k_normal;
-
-                float jv = dot(n, relative_velocity);
-
-                static const float beta = -0.2f;
-                static const float minimum_pen = 0.01f;
-
-//              float b = (beta / sub_time_step) * min(0.0f, -pen + minimum_pen);
-//              float lambda = effective_mass * (-jv + b);
-//              lambda = max(lambda, 0.0f);
-//              v2 impulse = lambda * n;
-
-                Graphics::circle(*a_center_of_mass, 0.075f, Color::RED);
-                Graphics::circle(*b_center_of_mass, 0.075f, Color::GREEN);
-
-                Graphics::arrow(*a_center_of_mass, *a_center_of_mass + ra, 0.01f, Color::YELLOW);
-                Graphics::arrow(*b_center_of_mass, *b_center_of_mass + rb, 0.01f, Color::YELLOW);
-                Graphics::circle(contact_position, 0.05f, Color::RED);
-                Graphics::arrow(contact_position, contact_position + n, 0.01f, Color::RED);
-            }
-        }
-#endif
-        
         for(int i = 0; i < box_list.geometry.size(); i++)
         {
             Box &geometry = box_list.geometry[i];
@@ -698,41 +678,6 @@ namespace Sandbox
             Graphics::arrow(geometry.center, geometry.center + rotate_vector(v2(1.0f, 0.0f) * geometry.radius, geometry.rotation), 0.01f, v4(Color::RED));
         }
     }
-#else
-    void LevelSandbox::step(float time_step)
-    {
-        v2 mouse = Graphics::mouse_world_position();
-
-        ImGui::Begin("main");
-
-        ImGui::Text("Hello");
-
-        static Box b1 = {};
-        b1.half_extents = v2(1.0f, 1.0f);
-        static float r = 0.0f;
-        r += time_step * 0.1f;
-        b1.rotation = r;
-
-        static Box b2 = {};
-        b2.center = mouse;
-        b2.half_extents = v2(1.0f, 1.0f);
-
-        Graphics::quad(b1.center, b1.half_extents, b1.rotation, Color::WHITE, 0.02f);
-        Graphics::quad(b2.center, b2.half_extents, b2.rotation, Color::WHITE, 0.02f);
-
-        Collision col;
-        bool collided = box_box(&b1, &b2, &col);
-        if(collided)
-        {
-            for(int i = 0; i < col.num_contacts; i++)
-            {
-                Graphics::circle(col.contacts[i].position, 0.05f, Color::RED, 1);
-            }
-        }
-
-        ImGui::End();
-    }
-#endif
     
     
     void LevelSandbox::make_body_box(const Kinematics &kinematics, const Box &shape)
