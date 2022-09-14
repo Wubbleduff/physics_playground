@@ -63,12 +63,12 @@ static void switch_level()
         level_state.level = new SimpleConstraints::LevelSimpleConstraints();
         level_state.level->init();
         break;
-        case SANDBOX:
-        level_state.level = new Sandbox::LevelSandbox();
-        level_state.level->init();
-        break;
         case CHAIN:
         level_state.level = new Chain::LevelChain();
+        level_state.level->init();
+        break;
+        case SANDBOX:
+        level_state.level = new Sandbox::LevelSandbox();
         level_state.level->init();
         break;
     }
