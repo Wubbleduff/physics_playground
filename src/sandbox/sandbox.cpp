@@ -9,6 +9,8 @@
 #include <time.h>
 #include <assert.h>
 
+#include <windows.h>
+
 using namespace GameMath;
 
 namespace Sandbox
@@ -229,11 +231,14 @@ namespace Sandbox
         return false;
     }
     
+#if 0
+    // Baseline 36 ms
     bool circle_circle(Circle *a, Circle *b, Collision *collision)
     {
+        collision->body_containing_reference_edge = false;
+
         v2 diff = b->center - a->center;
         float l = length(diff);
-        collision->body_containing_reference_edge = false;
         if((l > a->radius + b->radius) || EQ(l, a->radius + b->radius))
         {
             // No collision.
@@ -243,22 +248,99 @@ namespace Sandbox
         {
 
             // Collision.
+            v2 n = v2(1.0f, 0.0f);
             if(EQ(a->center, b->center))
             {
-                // Circles are exactly on top of each other. Build a fake collision normal.
-                diff = v2(1.0f, 0.0f);
+                // Circles are exactly on top of each other. Use fake collision normal.
+            }
+            else
+            {
+                n = normalize(diff);
             }
             
-            v2 ndiff = normalize(diff);
 
             collision->num_contacts = 1;
-            collision->contacts[0].normal = ndiff;
+            collision->contacts[0].normal = n;
             collision->contacts[0].pen = a->radius + b->radius - l;
-            collision->contacts[0].position = a->center + ndiff * a->radius;
+            collision->contacts[0].position = a->center + n * a->radius;
             
             return true;
         }
     }
+#elif 0
+    // 12 ms
+    bool circle_circle(Circle *a, Circle *b, Collision *collision)
+    {
+        collision->body_containing_reference_edge = false;
+
+        v2 diff = b->center - a->center;
+        float l = sqrt(diff.x*diff.x + diff.y*diff.y);
+        float radius_sum = a->radius + b->radius;
+        float pen = radius_sum - l;
+        if(pen < 0)
+        {
+            // No collision.
+            return false;
+        }
+        else 
+        {
+
+            // Collision.
+            v2 n = v2(1.0f, 0.0f);
+            if(EQ(a->center, b->center))
+            {
+                // Circles are exactly on top of each other. Use fake collision normal.
+            }
+            else
+            {
+                n = diff / l;
+            }
+
+            collision->num_contacts = 1;
+            collision->contacts[0].normal = n;
+            collision->contacts[0].pen = pen;
+            collision->contacts[0].position = a->center + n * a->radius;
+            
+            return true;
+        }
+    }
+#else
+    bool circle_circle(Circle *a, Circle *b, Collision *collision)
+    {
+        collision->body_containing_reference_edge = false;
+
+        v2 diff = b->center - a->center;
+        float l = sqrt(diff.x*diff.x + diff.y*diff.y);
+        float radius_sum = a->radius + b->radius;
+        float pen = radius_sum - l;
+        if(pen < 0)
+        {
+            // No collision.
+            return false;
+        }
+        else 
+        {
+
+            // Collision.
+            v2 n = v2(1.0f, 0.0f);
+            if(EQ(a->center, b->center))
+            {
+                // Circles are exactly on top of each other. Use fake collision normal.
+            }
+            else
+            {
+                n = diff / l;
+            }
+
+            collision->num_contacts = 1;
+            collision->contacts[0].normal = n;
+            collision->contacts[0].pen = pen;
+            collision->contacts[0].position = a->center + n * a->radius;
+            
+            return true;
+        }
+    }
+#endif
     
     static void update_body(Kinematics *kinematics, v2 *position, float *rotation, float time_step)
     {
@@ -289,7 +371,7 @@ namespace Sandbox
         //time_t t;
         //seed_random((unsigned)time(&t));
         seed_random(2);
-#if 1
+#if 0
         for(int i = 0; i < 100; i++)
         {
             v2 position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
@@ -311,7 +393,7 @@ namespace Sandbox
 #endif
         
 #if 1
-        int num_circles = 100;
+        int num_circles = 1000;
         for(int i = 0; i < num_circles; i++)
         {
             v2 position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
@@ -426,7 +508,7 @@ namespace Sandbox
         ImGui::InputFloat("Time scale", &time_scale, 0.1f);
         time_step *= time_scale;
 
-        int step_count = 8;
+        int step_count = 1;
         for(int step_i = 0; step_i < step_count; step_i++)
         {
             float sub_time_step = time_step / step_count;
@@ -492,6 +574,10 @@ namespace Sandbox
                 }
             }
             
+
+            LARGE_INTEGER start_circle_circle;
+            QueryPerformanceCounter(&start_circle_circle);
+
             for(int circle1i = 0; circle1i < circle_list.geometry.size(); circle1i++)
             {
                 for(int circle2i = circle1i + 1; circle2i < circle_list.geometry.size(); circle2i++)
@@ -510,6 +596,15 @@ namespace Sandbox
                     }
                 }
             }
+            
+            LARGE_INTEGER end_circle_circle;
+            QueryPerformanceCounter(&end_circle_circle);
+
+            uint64_t duration_circle_circle = end_circle_circle.QuadPart - start_circle_circle.QuadPart;
+
+            LARGE_INTEGER freq;
+            QueryPerformanceFrequency(&freq);
+            ImGui::Text("circle circle ms %f", ((double)duration_circle_circle / freq.QuadPart) * 1000.0);
 
             for(int collision_index = 0; collision_index < collisions.size(); collision_index++)
             {
