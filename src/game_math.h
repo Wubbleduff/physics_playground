@@ -130,6 +130,8 @@ namespace GameMath
     v2 operator-(v2 a);
     v3 operator-(v3 a);
     v4 operator-(v4 a);
+
+    bool operator==(v2 a, v2 b);
     
     float dot(v2 a, v2 b);
     float dot(v3 a, v3 b);

@@ -230,6 +230,120 @@ namespace Sandbox
         
         return false;
     }
+
+    bool soa_box_circle(
+       float box_x, float box_y, float box_hw, float box_hh, float box_rot,
+       float circle_x, float circle_y, float circle_r,
+       SoaCollision *collision)
+    {
+        collision->body_containing_reference_edge = false;
+
+        // Rotate the system so it's AABB vs circle collision where the box is at the origin.
+
+        //circle_center -= box_center;
+        //circle_center = rotate_vector(circle_center, -box->rotation);
+        float t_circle_x = (circle_x - box_x) * cosf(-box_rot) - (circle_y - box_y) * sinf(-box_rot);
+        float t_circle_y = (circle_x - box_x) * sinf(-box_rot) + (circle_y - box_y) * cosf(-box_rot);
+        
+        float clamped_x = GameMath::clamp(t_circle_x, -box_hw, box_hw);
+        float clamped_y = GameMath::clamp(t_circle_y, -box_hh, box_hh);
+
+        float diff_x = t_circle_x - clamped_x;
+        float diff_y = t_circle_y - clamped_y;
+        //float ll = diff_x*diff_x + diff_y*diff_y;
+        float l = sqrtf(diff_x * diff_x + diff_y * diff_y);
+        //if(ll < circle_r*circle_r)
+        if(l < circle_r)
+        {
+            // Collision
+            if(EQ(t_circle_x, clamped_x) && EQ(t_circle_y, clamped_y))
+            {
+                // Center in box
+                float c_min_x = t_circle_x - circle_r;
+                float c_min_y = t_circle_y - circle_r;
+                float c_max_x = t_circle_x + circle_r;
+                float c_max_y = t_circle_y + circle_r;
+                
+                float left_diff = c_max_x - (-box_hw);
+                float right_diff = box_hw - c_min_x;
+                float bottom_diff = c_max_y - (-box_hh);
+                float top_diff = box_hh - c_min_y;
+                float min_diff = min(left_diff, min(right_diff, min(bottom_diff, top_diff)));
+                
+                float n_x;
+                float n_y;
+                if(min_diff == left_diff)       { n_x=-1.0f; n_y= 0.0f; }
+                else if(min_diff == right_diff) { n_x= 1.0f; n_y= 0.0f; }
+                else if(min_diff == top_diff)   { n_x= 0.0f; n_y= 1.0f; }
+                else                            { n_x= 0.0f; n_y=-1.0f; }
+                
+                // Un-transform the system.
+                collision->num_contacts = 1;
+                /*
+                collision->contacts[0].position = circle_center + normal * (min_diff - circle->radius);
+                collision->contacts[0].position = rotate_vector(collision->contacts[0].position, box->rotation);
+                collision->contacts[0].position += box->center;
+                collision->contacts[0].normal = rotate_vector(normal, box->rotation);
+                collision->contacts[0].pen = min_diff;
+                */
+                float contact_x = t_circle_x + n_x * (min_diff - circle_r);
+                float contact_y = t_circle_y + n_y * (min_diff - circle_r);
+
+                float tmp_contact_x = contact_x * cosf(box_rot) - contact_y * sinf(box_rot);
+                float tmp_contact_y = contact_x * sinf(box_rot) + contact_y * cosf(box_rot);
+                contact_x = tmp_contact_x;
+                contact_y = tmp_contact_y;
+                contact_x += box_x;
+                contact_y += box_y;
+                collision->contacts[0].position.x = contact_x;
+                collision->contacts[0].position.y = contact_y;
+
+                float tmp_n_x = n_x * cosf(box_rot) - n_y * sinf(box_rot);
+                float tmp_n_y = n_x * sinf(box_rot) + n_y * cosf(box_rot);
+                n_x = tmp_n_x;
+                n_y = tmp_n_y;
+                collision->contacts[0].normal.x = n_x;
+                collision->contacts[0].normal.y = n_y;
+
+                collision->contacts[0].pen = min_diff;
+                
+                return true;
+            }
+            else
+            {
+                // Center outside of box
+                collision->num_contacts = 1;
+                /*
+                collision->contacts[0].position = clamped;
+                collision->contacts[0].position = rotate_vector(collision->contacts[0].position, box->rotation);
+                collision->contacts[0].position += box->center;
+                collision->contacts[0].normal = normalize(circle->center - collision->contacts[0].position);
+                collision->contacts[0].pen = circle->radius - length(circle->center - collision->contacts[0].position);
+                */
+                float contact_x = clamped_x;
+                float contact_y = clamped_y;
+                float tmp_contact_x = contact_x * cosf(box_rot) - contact_y * sinf(box_rot);
+                float tmp_contact_y = contact_x * sinf(box_rot) + contact_y * cosf(box_rot);
+                contact_x = tmp_contact_x;
+                contact_y = tmp_contact_y;
+                contact_x += box_x;
+                contact_y += box_y;
+                collision->contacts[0].position.x = contact_x;
+                collision->contacts[0].position.y = contact_y;
+
+                //float l = sqrtf(ll);
+                l = sqrtf((circle_x - contact_x) * (circle_x - contact_x) + (circle_y - contact_y) * (circle_y - contact_y));
+                collision->contacts[0].normal.x = (circle_x - contact_x) / l;
+                collision->contacts[0].normal.y = (circle_y - contact_y) / l;
+
+                collision->contacts[0].pen = circle_r - l;
+                
+                return true;
+            }
+        }
+        
+        return false;
+    }
     
 #if 0
     // Baseline 36 ms
@@ -267,50 +381,14 @@ namespace Sandbox
             return true;
         }
     }
-#elif 0
+#else
     // 12 ms
     bool circle_circle(Circle *a, Circle *b, Collision *collision)
     {
         collision->body_containing_reference_edge = false;
 
         v2 diff = b->center - a->center;
-        float l = sqrt(diff.x*diff.x + diff.y*diff.y);
-        float radius_sum = a->radius + b->radius;
-        float pen = radius_sum - l;
-        if(pen < 0)
-        {
-            // No collision.
-            return false;
-        }
-        else 
-        {
-
-            // Collision.
-            v2 n = v2(1.0f, 0.0f);
-            if(EQ(a->center, b->center))
-            {
-                // Circles are exactly on top of each other. Use fake collision normal.
-            }
-            else
-            {
-                n = diff / l;
-            }
-
-            collision->num_contacts = 1;
-            collision->contacts[0].normal = n;
-            collision->contacts[0].pen = pen;
-            collision->contacts[0].position = a->center + n * a->radius;
-            
-            return true;
-        }
-    }
-#else
-    bool circle_circle(Circle *a, Circle *b, Collision *collision)
-    {
-        collision->body_containing_reference_edge = false;
-
-        v2 diff = b->center - a->center;
-        float l = sqrt(diff.x*diff.x + diff.y*diff.y);
+        float l = sqrtf(diff.x*diff.x + diff.y*diff.y);
         float radius_sum = a->radius + b->radius;
         float pen = radius_sum - l;
         if(pen < 0)
@@ -341,29 +419,68 @@ namespace Sandbox
         }
     }
 #endif
+
+#if 1
+    bool soa_circle_circle(
+        float a_x, float a_y, float a_r, 
+        float b_x, float b_y, float b_r, 
+        SoaCollision *collision)
+
+    {
+        float diff_x = b_x - a_x;
+        float diff_y = b_y - a_y;
+        float l = sqrtf(diff_x*diff_x + diff_y*diff_y);
+        float radius_sum = a_r + b_r;
+        float pen = radius_sum - l;
+        if(pen < 0)
+        {
+            // No collision.
+            return false;
+        }
+        else 
+        {
+
+            // Collision.
+            float n_x = 1.0f;
+            float n_y = 0.0f;
+            if(l < MIN_SEPARATION_THRESHOLD)
+            {
+                // Circles are exactly on top of each other. Use fake collision normal.
+            }
+            else
+            {
+                n_x = diff_x / l;
+                n_y = diff_y / l;
+            }
+
+            collision->num_contacts = 1;
+            collision->contacts[0].normal.x = n_x;
+            collision->contacts[0].normal.y = n_y;
+            collision->contacts[0].pen = pen;
+            collision->contacts[0].position.x = a_x + n_x * a_r;
+            collision->contacts[0].position.y = a_y + n_y * a_r;
+            
+            return true;
+        }
+    }
+#endif
     
     static void update_body(Kinematics *kinematics, v2 *position, float *rotation, float time_step)
     {
-        static const float gravity = 9.81f;
-
         if(kinematics->is_static) return;
         
-        kinematics->velocity += (v2(0.0f, -gravity) + kinematics->acceleration_sum * kinematics->inv_mass) * time_step;
+        kinematics->velocity.y += -9.81f * time_step;
         *position += kinematics->velocity * time_step;
-        
-        kinematics->angular_velocity += kinematics->angular_acceleration_sum * kinematics->inv_moment_of_inertia * time_step;
         *rotation += kinematics->angular_velocity * time_step;
-        
-        kinematics->acceleration_sum = v2();
-        kinematics->angular_acceleration_sum = 0.0f;
     }
-    
+
     void LevelSandbox::init()
     {
         box_list.kinematics.clear();
         box_list.geometry.clear();
         circle_list.kinematics.clear();
         circle_list.geometry.clear();
+        soa_circle_list.num_circles = 0;
 
         Graphics::Camera::position() = v2(0.0f, 0.0f);
         Graphics::Camera::width() = 16.0f;
@@ -394,10 +511,11 @@ namespace Sandbox
         
 #if 1
         int num_circles = 1000;
+        //int num_circles = 10;
         for(int i = 0; i < num_circles; i++)
         {
             v2 position = v2(random_range(-2.0f, 2.0f), random_range(-2.0f, 2.0f));
-            float r = random_range(0.1f, 0.3f);
+            float r = random_range(0.05f, 0.1f);
             float mass = PI * r*r;
             float moment_of_inertia = (PI * r*r*r*r) * (1.0f / 4.0f);
             float inv_mass = 1.0f/mass;
@@ -411,70 +529,13 @@ namespace Sandbox
                              Kinematics { velocity, angular_velocity, v2(), 0.0f, inv_mass, inv_moment_of_inertia, false, },
                              Circle{ position, r, 0.0f }
                              );
+            make_body_soa_circle(
+                             Kinematics { velocity, angular_velocity, v2(), 0.0f, inv_mass, inv_moment_of_inertia, false, },
+                             Circle{ position, r, 0.0f }
+                             );
         }
 #endif
 
-// Rotate in to each other towards the outside
-#if 0
-        make_body_box(
-                      Kinematics { v2(0.0f, 0.0f), -1.0f, v2(), 0.0f, 1.0f, 1.0f, false, },
-                      Box { v2( 0.25f, 1.0f), v2(2.0f, 0.25f), 0.0f }
-                      );
-
-        make_body_box(
-                      Kinematics { v2(0.0f, 0.0f), 0.0f, v2(), 0.0f, 1.0f, 1.0f, false, },
-                      Box { v2(-0.25f, -1.0f), v2(2.0f, 0.25f), PI/2.0f }
-                      );
-#endif
-
-// Rotate and hit center of mass
-#if 0
-        float w = 0.10f;
-        float h = 2.0f;
-        float av = -0.5f;
-        make_body_box(
-                      Kinematics { v2(0.0f, 0.0f), av, v2(), 0.0f, 1.0f, 1.0f, false, },
-                      Box { v2( 0.0f, 0.0f), v2(w, h), PI/2.0f }
-                      );
-
-        make_body_box(
-                      Kinematics { v2(0.0f, 0.0f), av, v2(), 0.0f, 1.0f, 1.0f, false, },
-                      Box { v2(w + w, h + w), v2(w, h), PI/2.0f }
-                      );
-#endif
-
-// box2d compare
-#if 0
-        make_body_box(
-                      Kinematics { v2(0.0f, 0.0f), 0.0f, v2(), 0.0f, 1.0f, 0.118811876f, false, },
-                      Box { v2( 0.0f, 5.0f), v2(0.5f, 5.0f), 0.0f }
-                      );
-
-        make_body_box(
-                      Kinematics { v2(1.0f, 0.0f), 0.0f, v2(), 0.0f, 1.0f, 6.0f, false, },
-                      Box { v2(-5.0f, 10.4f), v2(0.5f, 0.5f), 0.0f }
-                      );
-#endif
-
-// Box standing on corner
-#if 0
-        v2 scale = v2(0.1f, 0.3f);
-        float mass = 0.1f;
-        float moment_of_inertia = mass * (scale.x * scale.x + scale.y * scale.y) / 12.0f; // TODO: Scale may be double here?
-        make_body_box(
-                      Kinematics { v2(0.0f, 0.0f), -2.85f, v2(), 0.0f, 1.0f/mass, 1.0f/moment_of_inertia, false, },
-                      Box { v2( 2.0f, 0.0f), scale, 0.4f }
-                      );
-#endif
-
-// Circle spinning on landing
-#if 0
-        make_body_circle(
-                      Kinematics { v2(0.0f, 0.0f), 10.0f, v2(), 0.0f, 1.0f, 10.0f, false, },
-                      Circle { v2(0.0f, 0.0f), 1.0f, 0.0f }
-                      );
-#endif
-        
         
 #if 1
         make_body_box(
@@ -493,9 +554,27 @@ namespace Sandbox
                       Kinematics { v2(0.0f, 0.0f), 0.0f, v2(), 0.0f, 0.0f, 0.0f, true, },
                       Box { v2(17.0f, 0.0f), v2(10.0f, 10.0f), 0.0f }
                       );
+
+        make_body_soa_box(
+                      Kinematics { v2(0.0f, 0.0f), 0.0f, v2(), 0.0f, 0.0f, 0.0f, true, },
+                      Box { v2(0.0f, -14.0f), v2(10.0f, 10.0f), 0.0f }
+                      );
+        make_body_soa_box(
+                      Kinematics { v2(0.0f, 0.0f), 0.0f, v2(), 0.0f, 0.0f, 0.0f, true, },
+                      Box { v2(0.0f, 14.0f), v2(10.0f, 10.0f), 0.0f }
+                      );
+        make_body_soa_box(
+                      Kinematics { v2(0.0f, 0.0f), 0.0f, v2(), 0.0f, 0.0f, 0.0f, true, },
+                      Box { v2(-17.0f, 0.0f), v2(10.0f, 10.0f), 0.0f }
+                      );
+        make_body_soa_box(
+                      Kinematics { v2(0.0f, 0.0f), 0.0f, v2(), 0.0f, 0.0f, 0.0f, true, },
+                      Box { v2(17.0f, 0.0f), v2(10.0f, 10.0f), 0.0f }
+                      );
 #endif
     }
-    
+
+
     void LevelSandbox::step(float time_step)
     {
         if(ImGui::Button("Reset"))
@@ -503,6 +582,41 @@ namespace Sandbox
             init();
             return;
         }
+
+        static bool use_soa = false;
+        ImGui::Checkbox("use soa", &use_soa);
+        //if(use_soa)
+        {
+            aos_step(time_step);
+        }
+        //else
+        {
+            soa_step(time_step);
+        }
+
+#if 1
+        for(int c1i = 0; c1i < circle_list.kinematics.size(); c1i++)
+        {
+            const Kinematics &c1k = circle_list.kinematics[c1i];
+            const Circle &c1g = circle_list.geometry[c1i];
+
+            assert(c1k.velocity.x == soa_circle_list.vx[c1i]);
+            assert(c1k.velocity.y == soa_circle_list.vy[c1i]);
+            assert(c1k.angular_velocity == soa_circle_list.av[c1i]);
+            assert(c1k.inv_mass == soa_circle_list.inv_mass[c1i]);
+            assert(c1k.inv_moment_of_inertia == soa_circle_list.inv_moment_of_inertia[c1i]);
+
+            assert(c1g.center.x == soa_circle_list.px[c1i]);
+            assert(c1g.center.y == soa_circle_list.py[c1i]);
+            assert(c1g.radius == soa_circle_list.r[c1i]);
+            assert(c1g.rotation == soa_circle_list.rotation[c1i]);
+        }
+#endif
+    }
+
+    
+    void LevelSandbox::aos_step(float time_step)
+    {
 
         static float time_scale = 1.0f;
         ImGui::InputFloat("Time scale", &time_scale, 0.1f);
@@ -541,7 +655,7 @@ namespace Sandbox
                         continue;
                     }
                     
-                    Collision c;
+                    Collision c = {};
 
                     bool collided = box_box(box1, box2, &c);
                     if(collided)
@@ -561,7 +675,7 @@ namespace Sandbox
                 {
                     Box *box = &(box_list.geometry[boxi]);
                     Circle *circle = &(circle_list.geometry[circlei]);
-                    Collision c;
+                    Collision c = {};
                     bool collided = box_circle(box, circle, &c);
                     if(collided)
                     {
@@ -584,7 +698,7 @@ namespace Sandbox
                 {
                     Circle *circle1 = &(circle_list.geometry[circle1i]);
                     Circle *circle2 = &(circle_list.geometry[circle2i]);
-                    Collision c;
+                    Collision c = {};
                     bool collided = circle_circle(circle1, circle2, &c);
                     if(collided)
                     {
@@ -685,7 +799,6 @@ namespace Sandbox
                     b->angular_velocity += (b->inv_moment_of_inertia * cross(rb, friction_impulse));
                 }
             }
-            last_collisions = collisions;
         }
 
         for(int i = 0; i < box_list.geometry.size(); i++)
@@ -700,6 +813,226 @@ namespace Sandbox
             Graphics::arrow(geometry.center, geometry.center + rotate_vector(v2(1.0f, 0.0f) * geometry.radius, geometry.rotation), 0.01f, v4(Color::RED));
         }
     }
+
+    void LevelSandbox::soa_step(float time_step)
+    {
+        int step_count = 1;
+        for(int step_i = 0; step_i < step_count; step_i++)
+        {
+            float sub_time_step = time_step / step_count;
+
+            // SOA
+            std::vector<SoaCollision> collisions;
+            for(int i = 0; i < soa_circle_list.num_circles; i++)
+            {
+                soa_circle_list.vy[i] += -9.81f * sub_time_step;
+                soa_circle_list.px[i] += soa_circle_list.vx[i] * sub_time_step;
+                soa_circle_list.py[i] += soa_circle_list.vy[i] * sub_time_step;
+                soa_circle_list.rotation[i] += soa_circle_list.av[i] * sub_time_step;
+            }
+
+
+            for(int i1 = 0; i1 < soa_box_list.num_boxes; i1++)
+            {
+                for(int i2 = 0; i2 < soa_circle_list.num_circles; i2++)
+                {
+                    SoaCollision c = {};
+                    bool collided = soa_box_circle(
+                        soa_box_list.px[i1], soa_box_list.py[i1], soa_box_list.hw[i1], soa_box_list.hh[i1], soa_box_list.rotation[i1],
+                        soa_circle_list.px[i2], soa_circle_list.py[i2], soa_circle_list.r[i2], 
+                        &c);
+                    if(collided)
+                    {
+                        c.a_index = i1;
+                        c.a_is_circle = false;
+                        c.b_index = i2;
+                        c.b_is_circle = true;
+                        collisions.push_back(c);
+                    }
+
+#if 0
+                    Collision check_collision = {};
+                    Box cb1 = {v2(soa_box_list.px[i1], soa_box_list.py[i1]), v2(soa_box_list.hw[i1], soa_box_list.hh[i1]), soa_box_list.rotation[i1]};
+                    Circle cc2 = {v2(soa_circle_list.px[i2], soa_circle_list.py[i2]), soa_circle_list.r[i2], 0.0f};
+                    bool check_collided = box_circle(&cb1, &cc2, &check_collision);
+                    assert(check_collided == collided);
+                    assert(check_collision.num_contacts == c.num_contacts);
+                    for(int ic = 0; ic < check_collision.num_contacts; ic++)
+                    {
+                        assert(check_collision.contacts[ic].pen == c.contacts[ic].pen);
+                        assert(check_collision.contacts[ic].normal == c.contacts[ic].normal);
+                        assert(check_collision.contacts[ic].position == c.contacts[ic].position);
+
+                        check_collided = box_circle(&cb1, &cc2, &check_collision);
+                        collided = soa_box_circle(
+                            soa_box_list.px[i1], soa_box_list.py[i1], soa_box_list.hw[i1], soa_box_list.hh[i1], soa_box_list.rotation[i1],
+                            soa_circle_list.px[i2], soa_circle_list.py[i2], soa_circle_list.r[i2],
+                            &c);
+                    }
+#endif
+                }
+            }
+
+            LARGE_INTEGER start_soa_circle_circle;
+            QueryPerformanceCounter(&start_soa_circle_circle);
+            for(int i1 = 0; i1 < soa_circle_list.num_circles; i1++)
+            {
+                for(int i2 = i1 + 1; i2 < soa_circle_list.num_circles; i2++)
+                {
+                    SoaCollision c = {};
+                    bool collided = soa_circle_circle(
+                        soa_circle_list.px[i1], soa_circle_list.py[i1], soa_circle_list.r[i1], 
+                        soa_circle_list.px[i2], soa_circle_list.py[i2], soa_circle_list.r[i2], 
+                        &c);
+                    if(collided)
+                    {
+                        c.a_index = i1;
+                        c.a_is_circle = true;
+                        c.b_index = i2;
+                        c.b_is_circle = true;
+                        collisions.push_back(c);
+                    }
+
+#if 0
+                    Collision check_collision = {};
+                    Circle cc1 = {v2(soa_circle_list.px[i1], soa_circle_list.py[i1]), soa_circle_list.r[i1], 0.0f};
+                    Circle cc2 = {v2(soa_circle_list.px[i2], soa_circle_list.py[i2]), soa_circle_list.r[i2], 0.0f};
+                    bool check_collided = circle_circle(&cc1, &cc2, &check_collision);
+                    assert(check_collided == collided);
+                    assert(check_collision.num_contacts == c.num_contacts);
+                    for(int ic = 0; ic < check_collision.num_contacts; ic++)
+                    {
+                        assert(check_collision.contacts[ic].pen == c.contacts[ic].pen);
+                        assert(check_collision.contacts[ic].normal == c.contacts[ic].normal);
+                        assert(check_collision.contacts[ic].position == c.contacts[ic].position);
+                    }
+#endif
+                }
+            }
+            LARGE_INTEGER end_soa_circle_circle;
+            QueryPerformanceCounter(&end_soa_circle_circle);
+            uint64_t duration_soa_circle_circle = end_soa_circle_circle.QuadPart - start_soa_circle_circle.QuadPart;
+            LARGE_INTEGER freq;
+            QueryPerformanceFrequency(&freq);
+            ImGui::Text("soa circle circle ms %f", ((double)duration_soa_circle_circle / freq.QuadPart) * 1000.0);
+
+            for(int collision_index = 0; collision_index < collisions.size(); collision_index++)
+            {
+                SoaCollision &collision = collisions[collision_index];
+
+#if 1
+                float *a_vx = (collision.a_is_circle) ? (soa_circle_list.vx + collision.a_index) : (soa_box_list.vx + collision.a_index);
+                float *a_vy = (collision.a_is_circle) ? (soa_circle_list.vy + collision.a_index) : (soa_box_list.vy + collision.a_index);
+                float *a_av = (collision.a_is_circle) ? (soa_circle_list.av + collision.a_index) : (soa_box_list.av + collision.a_index);
+                float *a_inv_mass = (collision.a_is_circle) ? (soa_circle_list.inv_mass + collision.a_index) : (soa_box_list.inv_mass + collision.a_index);
+                float *a_inv_moment_of_inertia = (collision.a_is_circle) ? (soa_circle_list.inv_moment_of_inertia + collision.a_index) : (soa_box_list.inv_moment_of_inertia + collision.a_index);
+                float *a_px = (collision.a_is_circle) ? (soa_circle_list.px + collision.a_index) : (soa_box_list.px + collision.a_index);
+                float *a_py = (collision.a_is_circle) ? (soa_circle_list.py + collision.a_index) : (soa_box_list.py + collision.a_index);
+
+                float *b_vx = (collision.b_is_circle) ? (soa_circle_list.vx + collision.b_index) : (soa_box_list.vx + collision.b_index);
+                float *b_vy = (collision.b_is_circle) ? (soa_circle_list.vy + collision.b_index) : (soa_box_list.vy + collision.b_index);
+                float *b_av = (collision.b_is_circle) ? (soa_circle_list.av + collision.b_index) : (soa_box_list.av + collision.b_index);
+                float *b_inv_mass = (collision.b_is_circle) ? (soa_circle_list.inv_mass + collision.b_index) : (soa_box_list.inv_mass + collision.b_index);
+                float *b_inv_moment_of_inertia = (collision.b_is_circle) ? (soa_circle_list.inv_moment_of_inertia + collision.b_index) : (soa_box_list.inv_moment_of_inertia + collision.b_index);
+                float *b_px = (collision.b_is_circle) ? (soa_circle_list.px + collision.b_index) : (soa_box_list.px + collision.b_index);
+                float *b_py = (collision.b_is_circle) ? (soa_circle_list.py + collision.b_index) : (soa_box_list.py + collision.b_index);
+#endif
+
+                if(collision.body_containing_reference_edge)
+                {
+                    std::swap(a_vx, b_vx);
+                    std::swap(a_vy, b_vy);
+                    std::swap(a_av, b_av);
+                    std::swap(a_inv_mass, b_inv_mass);
+                    std::swap(a_inv_moment_of_inertia, b_inv_moment_of_inertia);
+                    std::swap(a_px, b_px);
+                    std::swap(a_py, b_py);
+                }
+
+                for(int contact_index = 0; contact_index < collision.num_contacts; contact_index++)
+                {
+                    float pen = collision.contacts[contact_index].pen;
+                    assert(!EQ(collision.contacts[contact_index].normal, v2()));
+                    v2 n = normalize(collision.contacts[contact_index].normal);
+                    v2 contact_position = collision.contacts[contact_index].position;
+
+                    v2 ra = contact_position - v2(*a_px, *a_py);
+                    v2 rb = contact_position - v2(*b_px, *b_py);
+                    v2 relative_velocity = -(v2(*a_vx, *a_vy) + cross(*a_av, ra)) + (v2(*b_vx, *b_vy) + cross(*b_av, rb));
+
+                    float vn = dot(n, relative_velocity);
+
+                    static const float beta_coeff = -0.4f;
+                    static const float minimum_pen = 0.01f;
+
+                    float beta = (beta_coeff / sub_time_step) * min(0.0f, -pen + minimum_pen);
+
+                    float rna = dot(ra, n);
+                    float rnb = dot(rb, n);
+                    float k_normal = *a_inv_mass + *b_inv_mass;
+                    k_normal += *a_inv_moment_of_inertia * (dot(ra, ra) - rna * rna) + *b_inv_moment_of_inertia * (dot(rb, rb) - rnb * rnb);
+                    float effective_mass = 1.0f / k_normal;
+
+                    float lambda = effective_mass * (-vn + beta);
+                    lambda = max(lambda, 0.0f);
+                    v2 impulse = lambda * n;
+
+                    *a_vx += -(*a_inv_mass * impulse).x;
+                    *a_vy += -(*a_inv_mass * impulse).y;
+                    *a_av += -(*a_inv_moment_of_inertia * cross(ra, impulse));
+
+                    *b_vx += (*b_inv_mass * impulse).x;
+                    *b_vy += (*b_inv_mass * impulse).y;
+                    *b_av += (*b_inv_moment_of_inertia * cross(rb, impulse));
+
+                    // Friction
+                    v2 tangent = v2(n.y, -n.x);
+                    relative_velocity = -(v2(*a_vx, *a_vy) + cross(*a_av, ra)) + (v2(*b_vx, *b_vy) + cross(*b_av, rb));
+
+                    float vt = dot(tangent, relative_velocity);
+
+                    float rta = dot(ra, tangent);
+                    float rtb = dot(rb, tangent);
+                    float k_tangent = *a_inv_mass + *b_inv_mass;
+                    k_tangent += *a_inv_moment_of_inertia * (dot(ra, ra) - rta * rta) + *b_inv_moment_of_inertia * (dot(rb, rb) - rtb * rtb);
+                    float mass_tangent = 1.0f / k_tangent;
+                    float dpt = mass_tangent * -vt;
+
+                    const static float friction = 0.1f;
+                    float maxPt = friction * lambda;
+                    dpt = clamp(dpt, -maxPt, maxPt);
+                    v2 friction_impulse = dpt * tangent;
+
+                    *a_vx += -(*a_inv_mass * friction_impulse).x;
+                    *a_vy += -(*a_inv_mass * friction_impulse).y;
+                    *a_av += -(*a_inv_moment_of_inertia * cross(ra, friction_impulse));
+
+                    *b_vx += (*b_inv_mass * friction_impulse).x;
+                    *b_vy += (*b_inv_mass * friction_impulse).y;
+                    *b_av += (*b_inv_moment_of_inertia * cross(rb, friction_impulse));
+                }
+            }
+        }
+
+
+        for(int i = 0; i < soa_box_list.num_boxes; i++)
+        {
+            v2 center = v2(soa_box_list.px[i], soa_box_list.py[i]);
+            v2 he = v2(soa_box_list.hw[i], soa_box_list.hh[i]);
+            float rotation = soa_box_list.rotation[i];
+            Graphics::quad_outline(center, he, rotation, Color::BLUE, 0.01f);
+            //Graphics::arrow(center, center + rotate_vector(v2(1.0f, 0.0f) * r, rotation), 0.01f, v4(Color::RED));
+        }
+
+        for(int i = 0; i < soa_circle_list.num_circles; i++)
+        {
+            v2 center = v2(soa_circle_list.px[i], soa_circle_list.py[i]);
+            float r = soa_circle_list.r[i];
+            float rotation = soa_circle_list.rotation[i];
+            Graphics::circle_outline(center, r, Color::GREEN, 0.01f);
+            Graphics::arrow(center, center + rotate_vector(v2(1.0f, 0.0f) * r, rotation), 0.01f, v4(Color::RED));
+        }
+    }
     
     void LevelSandbox::make_body_box(const Kinematics &kinematics, const Box &shape)
     {
@@ -711,6 +1044,39 @@ namespace Sandbox
     {
         circle_list.kinematics.emplace_back(kinematics);
         circle_list.geometry.emplace_back(shape);
+    }
+
+    void LevelSandbox::make_body_soa_box(const Kinematics &kinematics, const Box &shape)
+    {
+        assert(soa_box_list.num_boxes <= SoaBoxList::MAX_BOXES);
+        uint32_t &n = soa_box_list.num_boxes;
+        soa_box_list.vx[n] = kinematics.velocity.x;
+        soa_box_list.vy[n] = kinematics.velocity.y;
+        soa_box_list.av[n] = kinematics.angular_velocity;
+        soa_box_list.inv_mass[n] = kinematics.inv_mass;
+        soa_box_list.inv_moment_of_inertia[n] = kinematics.inv_moment_of_inertia;
+        soa_box_list.px[n] = shape.center.x;
+        soa_box_list.py[n] = shape.center.y;
+        soa_box_list.hw[n] = shape.half_extents.x;
+        soa_box_list.hh[n] = shape.half_extents.y;
+        soa_box_list.rotation[n] = shape.rotation;
+        n++;
+    }
+
+    void LevelSandbox::make_body_soa_circle(const Kinematics &kinematics, const Circle &shape)
+    {
+        assert(soa_circle_list.num_circles <= SoaCircleList::MAX_CIRCLES);
+        uint32_t &n = soa_circle_list.num_circles;
+        soa_circle_list.vx[n] = kinematics.velocity.x;
+        soa_circle_list.vy[n] = kinematics.velocity.y;
+        soa_circle_list.av[n] = kinematics.angular_velocity;
+        soa_circle_list.inv_mass[n] = kinematics.inv_mass;
+        soa_circle_list.inv_moment_of_inertia[n] = kinematics.inv_moment_of_inertia;
+        soa_circle_list.px[n] = shape.center.x;
+        soa_circle_list.py[n] = shape.center.y;
+        soa_circle_list.r[n] = shape.radius;
+        soa_circle_list.rotation[n] = shape.rotation;
+        n++;
     }
 }
 

@@ -71,6 +71,11 @@ namespace GameMath
     v3 operator-(v3 a) { return v3(-a.x, -a.y, -a.z); }
     v4 operator-(v4 a) { return v4(-a.x, -a.y, -a.z, -a.w); }
 
+    bool operator==(v2 a, v2 b)
+    {
+        return (a.x == b.x) && (a.y == b.y);
+    }
+
     float dot(v2 a, v2 b) { return (a.x * b.x) + (a.y * b.y); }
     float dot(v3 a, v3 b) { return (a.x * b.x) + (a.y * b.y) + (a.z * b.z); }
     float dot(v4 a, v4 b) { return (a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w); }

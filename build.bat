@@ -37,3 +37,6 @@ xcopy /Y /E assets %DEBUG_RUN_TREE%\assets\
 
 %DEBUG_RUN_TREE%\%EXE%
 
+src;lib\glad\include;lib\glfw\include;lib\imgui;lib\imgui\examples;lib\stb
+opengl32.lib
+lib\glfw\glfw.lib

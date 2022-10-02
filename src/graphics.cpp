@@ -810,7 +810,7 @@ bool Graphics::init()
         glGenBuffers(1, &instance->batch_circle_outline_buffer->vbo);
         check_gl_errors("making vbo");
         
-        static const int MAX_CIRCLE_OUTLINES = 1024 * 1;
+        static const int MAX_CIRCLE_OUTLINES = 1024 * 10;
         glBindBuffer(GL_ARRAY_BUFFER, instance->batch_circle_outline_buffer->vbo);
         glBufferData(GL_ARRAY_BUFFER, MAX_CIRCLE_OUTLINES * sizeof(GraphicsState::CircleOutlineRenderingData), nullptr, GL_DYNAMIC_DRAW);
         check_gl_errors("send vbo data");

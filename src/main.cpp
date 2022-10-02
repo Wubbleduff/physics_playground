@@ -47,7 +47,7 @@ static void switch_level()
     
     switch(level_state.next_level)
     {
-        case DYNAMICS:
+        /*case DYNAMICS:
         level_state.level = new LevelDynamics();
         level_state.level->init();
         break;
@@ -66,7 +66,7 @@ static void switch_level()
         case CHAIN:
         level_state.level = new Chain::LevelChain();
         level_state.level->init();
-        break;
+        break;*/
         case SANDBOX:
         level_state.level = new Sandbox::LevelSandbox();
         level_state.level->init();
