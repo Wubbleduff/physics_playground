@@ -41,33 +41,33 @@ namespace Sandbox
 
     struct Contact
     {
-        float pen;
-        GameMath::v2 normal;
-        GameMath::v2 position;
+        float pen = 0.0f;
+        GameMath::v2 normal = GameMath::v2(1.0f, 0.0f);
+        GameMath::v2 position = GameMath::v2();
     };
     
     struct Collision
     {
-        uint32_t num_contacts;
+        uint32_t num_contacts = 0;
         Contact contacts[2];
-        bool body_containing_reference_edge;
+        bool body_containing_reference_edge = false;
 
-        Kinematics *a_kinematics;
-        Kinematics *b_kinematics;
-        GameMath::v2 *a_center_of_mass;
-        GameMath::v2 *b_center_of_mass;
+        Kinematics *a_kinematics = nullptr;
+        Kinematics *b_kinematics = nullptr;
+        GameMath::v2 *a_center_of_mass = nullptr;
+        GameMath::v2 *b_center_of_mass = nullptr;
     };
 
     struct SoaCollision
     {
-        uint32_t num_contacts;
+        uint32_t num_contacts = 0;
         Contact contacts[2];
-        bool body_containing_reference_edge;
+        bool body_containing_reference_edge = false;;
 
-        uint32_t a_index;
-        bool a_is_circle;
-        uint32_t b_index;
-        bool b_is_circle;
+        uint32_t a_index = -1;
+        bool a_is_circle = false;
+        uint32_t b_index = -1;
+        bool b_is_circle = false;
     };
     
     bool box_box(Box *a, Box *b, Collision *collision);
@@ -120,17 +120,18 @@ namespace Sandbox
         struct SoaCircleList
         {
             static const uint32_t MAX_CIRCLES = 1024;
+            static const uint32_t CIRCLES_CAPACITY = MAX_CIRCLES + 8; // Pad for SIMD
             uint32_t num_circles = 0;
 
-            float vx[MAX_CIRCLES];
-            float vy[MAX_CIRCLES];
-            float av[MAX_CIRCLES];
-            float inv_mass[MAX_CIRCLES];
-            float inv_moment_of_inertia[MAX_CIRCLES];
-            float px[MAX_CIRCLES];
-            float py[MAX_CIRCLES];
-            float r[MAX_CIRCLES];
-            float rotation[MAX_CIRCLES];
+            float vx[CIRCLES_CAPACITY];
+            float vy[CIRCLES_CAPACITY];
+            float av[CIRCLES_CAPACITY];
+            float inv_mass[CIRCLES_CAPACITY];
+            float inv_moment_of_inertia[CIRCLES_CAPACITY];
+            float px[CIRCLES_CAPACITY];
+            float py[CIRCLES_CAPACITY];
+            float r[CIRCLES_CAPACITY];
+            float rotation[CIRCLES_CAPACITY];
         } soa_circle_list;
         
     };

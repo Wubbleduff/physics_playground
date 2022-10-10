@@ -11,6 +11,8 @@
 
 #include <windows.h>
 
+#include <intrin.h>
+
 using namespace GameMath;
 
 namespace Sandbox
@@ -33,6 +35,13 @@ namespace Sandbox
     inline float cross(v2 a, v2 b)
     {
         return a.x * b.y - a.y * b.x;
+    }
+
+    inline float mm_read(__m256 r, uint32_t i)
+    {
+        float b[8];
+        _mm256_store_ps(&(b[0]), r);
+        return b[i];
     }
 
     // n assumed to be normalized.
@@ -421,47 +430,55 @@ namespace Sandbox
 #endif
 
 #if 1
+    // Collision info is assumed to have the defaults:
+    // * The collision normal must not be 0
+    // * All other fields set to 0
     bool soa_circle_circle(
         float a_x, float a_y, float a_r, 
         float b_x, float b_y, float b_r, 
         SoaCollision *collision)
 
     {
+        /*
+        collision->num_contacts = 1;
+        collision->contacts[0].normal.x = n_x;
+        collision->contacts[0].normal.y = n_y;
+        collision->contacts[0].pen = pen;
+        collision->contacts[0].position.x = a_x + n_x * a_r;
+        collision->contacts[0].position.y = a_y + n_y * a_r;
+        */
+
+        collision->num_contacts = 1;
+        Contact &c = collision->contacts[0];
+
+#if 1
         float diff_x = b_x - a_x;
         float diff_y = b_y - a_y;
         float l = sqrtf(diff_x*diff_x + diff_y*diff_y);
+        c.normal.x = diff_x / l;
+        c.normal.y = diff_y / l;
+        c.position.x = a_x + c.normal.x * a_r;
+        c.position.y = a_y + c.normal.y * a_r;
         float radius_sum = a_r + b_r;
-        float pen = radius_sum - l;
-        if(pen < 0)
+        c.pen = radius_sum - l;
+        return c.pen > 0;
+#else
+        float diff_x = b_x - a_x;
+        float diff_y = b_y - a_y;
+        float ll = diff_x*diff_x + diff_y*diff_y;
+        float radius_sum = a_r + b_r;
+        if(ll < radius_sum*radius_sum)
         {
-            // No collision.
-            return false;
-        }
-        else 
-        {
-
-            // Collision.
-            float n_x = 1.0f;
-            float n_y = 0.0f;
-            if(l < MIN_SEPARATION_THRESHOLD)
-            {
-                // Circles are exactly on top of each other. Use fake collision normal.
-            }
-            else
-            {
-                n_x = diff_x / l;
-                n_y = diff_y / l;
-            }
-
-            collision->num_contacts = 1;
-            collision->contacts[0].normal.x = n_x;
-            collision->contacts[0].normal.y = n_y;
-            collision->contacts[0].pen = pen;
-            collision->contacts[0].position.x = a_x + n_x * a_r;
-            collision->contacts[0].position.y = a_y + n_y * a_r;
-            
+            float l = sqrtf(ll);
+            c.normal.x = diff_x / l;
+            c.normal.y = diff_y / l;
+            c.position.x = a_x + c.normal.x * a_r;
+            c.position.y = a_y + c.normal.y * a_r;
+            c.pen = radius_sum - l;
             return true;
         }
+        return false;
+#endif
     }
 #endif
     
@@ -587,14 +604,14 @@ namespace Sandbox
         ImGui::Checkbox("use soa", &use_soa);
         //if(use_soa)
         {
-            aos_step(time_step);
+            //aos_step(time_step);
         }
         //else
         {
             soa_step(time_step);
         }
 
-#if 1
+#if 0
         for(int c1i = 0; c1i < circle_list.kinematics.size(); c1i++)
         {
             const Kinematics &c1k = circle_list.kinematics[c1i];
@@ -713,12 +730,24 @@ namespace Sandbox
             
             LARGE_INTEGER end_circle_circle;
             QueryPerformanceCounter(&end_circle_circle);
-
             uint64_t duration_circle_circle = end_circle_circle.QuadPart - start_circle_circle.QuadPart;
 
-            LARGE_INTEGER freq;
-            QueryPerformanceFrequency(&freq);
-            ImGui::Text("circle circle ms %f", ((double)duration_circle_circle / freq.QuadPart) * 1000.0);
+            {
+                static uint64_t duration_list[64];
+                static uint32_t duration_list_end = 0;
+                duration_list[duration_list_end++] = duration_circle_circle;
+                if(duration_list_end >= 64) duration_list_end = 0;
+
+                LARGE_INTEGER freq;
+                QueryPerformanceFrequency(&freq);
+
+                uint64_t duration_sum = 0;
+                for(int i = 0; i < 64; i++) duration_sum += duration_list[i];
+                double duration_sum_ms = ((double)duration_sum / freq.QuadPart) * 1000.0;
+                double avg_duration = duration_sum_ms / 64.0;
+
+                ImGui::Text("circle circle ms %f", avg_duration);
+            }
 
             for(int collision_index = 0; collision_index < collisions.size(); collision_index++)
             {
@@ -836,7 +865,7 @@ namespace Sandbox
             {
                 for(int i2 = 0; i2 < soa_circle_list.num_circles; i2++)
                 {
-                    SoaCollision c = {};
+                    SoaCollision c = SoaCollision();
                     bool collided = soa_box_circle(
                         soa_box_list.px[i1], soa_box_list.py[i1], soa_box_list.hw[i1], soa_box_list.hh[i1], soa_box_list.rotation[i1],
                         soa_circle_list.px[i2], soa_circle_list.py[i2], soa_circle_list.r[i2], 
@@ -875,15 +904,21 @@ namespace Sandbox
 
             LARGE_INTEGER start_soa_circle_circle;
             QueryPerformanceCounter(&start_soa_circle_circle);
+
+
+
+
+#if 0
             for(int i1 = 0; i1 < soa_circle_list.num_circles; i1++)
             {
                 for(int i2 = i1 + 1; i2 < soa_circle_list.num_circles; i2++)
                 {
-                    SoaCollision c = {};
+                    SoaCollision c = SoaCollision();
                     bool collided = soa_circle_circle(
                         soa_circle_list.px[i1], soa_circle_list.py[i1], soa_circle_list.r[i1], 
                         soa_circle_list.px[i2], soa_circle_list.py[i2], soa_circle_list.r[i2], 
                         &c);
+
                     if(collided)
                     {
                         c.a_index = i1;
@@ -909,12 +944,80 @@ namespace Sandbox
 #endif
                 }
             }
+#else
+            for(int i1 = 0; i1 < soa_circle_list.num_circles; i1 += 8)
+            {
+                __m256 a_x = _mm256_load_ps(soa_circle_list.px + i1);
+                __m256 a_y = _mm256_load_ps(soa_circle_list.py + i1);
+                __m256 a_r = _mm256_load_ps(soa_circle_list.r  + i1);
+
+                for(int i2 = i1 + 1; i2 < soa_circle_list.num_circles; i2++)
+                {
+                    SoaCollision c = SoaCollision();
+                    __m256 b_x = _mm256_load_ps(soa_circle_list.px + i2);
+                    __m256 b_y = _mm256_load_ps(soa_circle_list.py + i2);
+                    __m256 b_r = _mm256_load_ps(soa_circle_list.r  + i2);
+
+                    __m256 diff_x = _mm256_sub_ps(b_x, a_x);
+                    __m256 diff_y = _mm256_sub_ps(b_y, a_y);
+
+                    __m256 ll = _mm256_fmadd_ps(diff_x, diff_x, _mm256_mul_ps(diff_y, diff_y));
+                    __m256 r_l = _mm256_rsqrt_ps(ll);
+                    __m256 n_x = _mm256_mul_ps(diff_x, r_l);
+                    __m256 n_y = _mm256_mul_ps(diff_y, r_l);
+
+                    __m256 p_x = _mm256_fmadd_ps(n_x, a_r, a_x);
+                    __m256 p_y = _mm256_fmadd_ps(n_y, a_r, a_y);
+
+                    __m256 radius_sum = _mm256_add_ps(a_r, b_r);
+                    __m256 l = _mm256_rcp_ps(r_l);
+                    __m256 pen = _mm256_sub_ps(radius_sum, l);
+                    __m256 collision_mask = _mm256_cmp_ps(pen, _mm256_set1_ps(0.0f), _CMP_GT_OS);
+
+                    for(int i = 0; i < 8; i++)
+                    {
+                        if(mm_read(collision_mask, i))
+                        {
+                            SoaCollision c = SoaCollision();
+                            c.num_contacts = 1;
+                            c.contacts[0].pen = mm_read(pen, i);
+                            c.contacts[0].normal.x = mm_read(n_x, i);
+                            c.contacts[0].normal.y = mm_read(n_y, i);
+                            c.contacts[0].position.x = mm_read(p_x, i);
+                            c.contacts[0].position.y = mm_read(p_y, i);
+                            c.body_containing_reference_edge = false;
+                            c.a_index = i1 + i;
+                            c.a_is_circle = true;
+                            c.b_index = i2 + i;
+                            c.b_is_circle = true;
+                            collisions.push_back(c);
+                        }
+                    }
+                }
+            }
+#endif
+
             LARGE_INTEGER end_soa_circle_circle;
             QueryPerformanceCounter(&end_soa_circle_circle);
             uint64_t duration_soa_circle_circle = end_soa_circle_circle.QuadPart - start_soa_circle_circle.QuadPart;
-            LARGE_INTEGER freq;
-            QueryPerformanceFrequency(&freq);
-            ImGui::Text("soa circle circle ms %f", ((double)duration_soa_circle_circle / freq.QuadPart) * 1000.0);
+
+            {
+                static uint64_t duration_list[64];
+                static uint32_t duration_list_end = 0;
+                duration_list[duration_list_end++] = duration_soa_circle_circle;
+                if(duration_list_end >= 64) duration_list_end = 0;
+
+                LARGE_INTEGER freq;
+                QueryPerformanceFrequency(&freq);
+
+                uint64_t duration_sum = 0;
+                for(int i = 0; i < 64; i++) duration_sum += duration_list[i];
+                double duration_sum_ms = ((double)duration_sum / freq.QuadPart) * 1000.0;
+                double avg_duration = duration_sum_ms / 64.0;
+
+                ImGui::Text("soa circle circle ms %f", avg_duration);
+            }
+
 
             for(int collision_index = 0; collision_index < collisions.size(); collision_index++)
             {
