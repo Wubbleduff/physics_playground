@@ -619,7 +619,7 @@ namespace Sandbox
         ImGui::Checkbox("use soa", &use_soa);
         //if(use_soa)
         {
-            aos_step(time_step);
+            //aos_step(time_step);
         }
         //else
         {
@@ -1032,10 +1032,12 @@ namespace Sandbox
                     _mm256_storeu_ps(circle_circle_collisions.p_y + num_circle_circle_collisions, packed_p_y);
 
                     __m256i packed_a_index = _mm256_permutevar8x32_epi32(a_index, shufmask);
-                    _mm256_storeu_epi32(circle_circle_collisions.a_index + num_circle_circle_collisions, packed_a_index);
+                    __m256i a_index_target = _mm256_insert_epi64(_mm256_set1_epi32(0), (uint64_t)(circle_circle_collisions.a_index + num_circle_circle_collisions), 0);
+                    _mm256_storeu_si256((__m256i *)a_index_target.m256i_u64[0], packed_a_index);
                     
                     __m256i packed_b_index = _mm256_permutevar8x32_epi32(b_index, shufmask);
-                    _mm256_storeu_epi32(circle_circle_collisions.b_index + num_circle_circle_collisions, packed_b_index);
+                    __m256i b_index_target = _mm256_insert_epi64(_mm256_set1_epi32(0), (uint64_t)(circle_circle_collisions.b_index + num_circle_circle_collisions), 0);
+                    _mm256_storeu_si256((__m256i *)b_index_target.m256i_u64[0], packed_b_index);
 
                     int num_valid = _mm_popcnt_u64(collision_mask32);
                     num_circle_circle_collisions += num_valid;
