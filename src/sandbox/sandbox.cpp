@@ -11,7 +11,7 @@
 
 #include <windows.h>
 
-#include <intrin.h>
+#include <immintrin.h>
 
 using namespace GameMath;
 
@@ -60,6 +60,21 @@ namespace Sandbox
 
         float ratio = v0n / (v0n + (-v1n));
         return v0 + (v1 - v0) * ratio;
+    }
+
+    __m256 compress256(__m256 src, unsigned int mask /* from movmskps */)
+    {
+      uint64_t expanded_mask = _pdep_u64(mask, 0x0101010101010101);  // unpack each bit to a byte
+      expanded_mask *= 0xFF;    // mask |= mask<<1 | mask<<2 | ... | mask<<7;
+      // ABC... -> AAAAAAAABBBBBBBBCCCCCCCC...: replicate each bit to fill its byte
+
+      const uint64_t identity_indices = 0x0706050403020100;    // the identity shuffle for vpermps, packed to one index per byte
+      uint64_t wanted_indices = _pext_u64(identity_indices, expanded_mask);
+
+      __m128i bytevec = _mm_cvtsi64_si128(wanted_indices);
+      __m256i shufmask = _mm256_cvtepu8_epi32(bytevec);
+
+      return _mm256_permutevar8x32_ps(src, shufmask);
     }
     
     bool box_box(Box *a, Box *b, Collision *collision)
@@ -604,7 +619,7 @@ namespace Sandbox
         ImGui::Checkbox("use soa", &use_soa);
         //if(use_soa)
         {
-            //aos_step(time_step);
+            aos_step(time_step);
         }
         //else
         {
@@ -843,6 +858,27 @@ namespace Sandbox
         }
     }
 
+    struct SoaCollisions
+    {
+        static const uint32_t MAX_COLLISIONS = 1024*1024;
+
+        uint32_t a_index[MAX_COLLISIONS];
+        uint32_t b_index[MAX_COLLISIONS];
+
+        // TODO Remove or make bit array
+        bool a_is_circle[MAX_COLLISIONS];
+        bool b_is_circle[MAX_COLLISIONS];
+
+        // TODO Just switch the normal direction in the collision code
+        bool body_containing_reference_edge[MAX_COLLISIONS];
+
+        float pen[MAX_COLLISIONS];
+        float n_x[MAX_COLLISIONS];
+        float n_y[MAX_COLLISIONS];
+        float p_x[MAX_COLLISIONS];
+        float p_y[MAX_COLLISIONS];
+    };
+
     void LevelSandbox::soa_step(float time_step)
     {
         int step_count = 1;
@@ -850,8 +886,6 @@ namespace Sandbox
         {
             float sub_time_step = time_step / step_count;
 
-            // SOA
-            std::vector<SoaCollision> collisions;
             for(int i = 0; i < soa_circle_list.num_circles; i++)
             {
                 soa_circle_list.vy[i] += -9.81f * sub_time_step;
@@ -860,6 +894,13 @@ namespace Sandbox
                 soa_circle_list.rotation[i] += soa_circle_list.av[i] * sub_time_step;
             }
 
+            static SoaCollisions circle_circle_collisions = {};
+            static uint32_t num_circle_circle_collisions = 0;
+
+            static SoaCollisions box_circle_collisions = {};
+            static uint32_t num_box_circle_collisions = 0;
+
+            std::vector<SoaCollision> collisions;
 
             for(int i1 = 0; i1 < soa_box_list.num_boxes; i1++)
             {
@@ -870,6 +911,7 @@ namespace Sandbox
                         soa_box_list.px[i1], soa_box_list.py[i1], soa_box_list.hw[i1], soa_box_list.hh[i1], soa_box_list.rotation[i1],
                         soa_circle_list.px[i2], soa_circle_list.py[i2], soa_circle_list.r[i2], 
                         &c);
+
                     if(collided)
                     {
                         c.a_index = i1;
@@ -877,28 +919,19 @@ namespace Sandbox
                         c.b_index = i2;
                         c.b_is_circle = true;
                         collisions.push_back(c);
+
+                        box_circle_collisions.a_index[num_box_circle_collisions] = i1;
+                        box_circle_collisions.b_index[num_box_circle_collisions] = i2;
+                        box_circle_collisions.a_is_circle[num_box_circle_collisions] = false;
+                        box_circle_collisions.b_is_circle[num_box_circle_collisions] = true;
+                        box_circle_collisions.pen[num_box_circle_collisions] = c.contacts[0].pen;
+                        box_circle_collisions.n_x[num_box_circle_collisions] = c.contacts[0].normal.x;
+                        box_circle_collisions.n_y[num_box_circle_collisions] = c.contacts[0].normal.y;
+                        box_circle_collisions.p_x[num_box_circle_collisions] = c.contacts[0].position.x;
+                        box_circle_collisions.p_y[num_box_circle_collisions] = c.contacts[0].position.y;
+                        num_box_circle_collisions++;
                     }
 
-#if 0
-                    Collision check_collision = {};
-                    Box cb1 = {v2(soa_box_list.px[i1], soa_box_list.py[i1]), v2(soa_box_list.hw[i1], soa_box_list.hh[i1]), soa_box_list.rotation[i1]};
-                    Circle cc2 = {v2(soa_circle_list.px[i2], soa_circle_list.py[i2]), soa_circle_list.r[i2], 0.0f};
-                    bool check_collided = box_circle(&cb1, &cc2, &check_collision);
-                    assert(check_collided == collided);
-                    assert(check_collision.num_contacts == c.num_contacts);
-                    for(int ic = 0; ic < check_collision.num_contacts; ic++)
-                    {
-                        assert(check_collision.contacts[ic].pen == c.contacts[ic].pen);
-                        assert(check_collision.contacts[ic].normal == c.contacts[ic].normal);
-                        assert(check_collision.contacts[ic].position == c.contacts[ic].position);
-
-                        check_collided = box_circle(&cb1, &cc2, &check_collision);
-                        collided = soa_box_circle(
-                            soa_box_list.px[i1], soa_box_list.py[i1], soa_box_list.hw[i1], soa_box_list.hh[i1], soa_box_list.rotation[i1],
-                            soa_circle_list.px[i2], soa_circle_list.py[i2], soa_circle_list.r[i2],
-                            &c);
-                    }
-#endif
                 }
             }
 
@@ -945,12 +978,14 @@ namespace Sandbox
                 }
             }
 #else
+            __m256i a_index = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
             for(int i1 = 0; i1 < soa_circle_list.num_circles; i1 += 8)
             {
                 __m256 a_x = _mm256_load_ps(soa_circle_list.px + i1);
                 __m256 a_y = _mm256_load_ps(soa_circle_list.py + i1);
                 __m256 a_r = _mm256_load_ps(soa_circle_list.r  + i1);
 
+                __m256i b_index = _mm256_setr_epi32(i1 + 1, i1 + 2, i1 + 3, i1 + 4, i1 + 5, i1 + 6, i1 + 7, i1 + 8);
                 for(int i2 = i1 + 1; i2 < soa_circle_list.num_circles; i2++)
                 {
                     SoaCollision c = SoaCollision();
@@ -974,26 +1009,41 @@ namespace Sandbox
                     __m256 pen = _mm256_sub_ps(radius_sum, l);
                     __m256 collision_mask = _mm256_cmp_ps(pen, _mm256_set1_ps(0.0f), _CMP_GT_OS);
 
-                    for(int i = 0; i < 8; i++)
-                    {
-                        if(mm_read(collision_mask, i))
-                        {
-                            SoaCollision c = SoaCollision();
-                            c.num_contacts = 1;
-                            c.contacts[0].pen = mm_read(pen, i);
-                            c.contacts[0].normal.x = mm_read(n_x, i);
-                            c.contacts[0].normal.y = mm_read(n_y, i);
-                            c.contacts[0].position.x = mm_read(p_x, i);
-                            c.contacts[0].position.y = mm_read(p_y, i);
-                            c.body_containing_reference_edge = false;
-                            c.a_index = i1 + i;
-                            c.a_is_circle = true;
-                            c.b_index = i2 + i;
-                            c.b_is_circle = true;
-                            collisions.push_back(c);
-                        }
-                    }
+                    // https://stackoverflow.com/questions/36932240/avx2-what-is-the-most-efficient-way-to-pack-left-based-on-a-mask
+                    int collision_mask32 = _mm256_movemask_ps(collision_mask);
+                    uint64_t expanded_mask = _pdep_u64(collision_mask32, 0x0101010101010101);  // unpack each bit to a byte
+                    expanded_mask *= 0xFF;
+                    uint64_t wanted_indices = _pext_u64(0x0706050403020100, expanded_mask);
+                    __m256i shufmask = _mm256_cvtepu8_epi32(_mm_cvtsi64_si128(wanted_indices));
+
+                    __m256 packed_pen = _mm256_permutevar8x32_ps(pen, shufmask);
+                    _mm256_storeu_ps(circle_circle_collisions.pen + num_circle_circle_collisions, packed_pen);
+
+                    __m256 packed_n_x = _mm256_permutevar8x32_ps(n_x, shufmask);
+                    _mm256_storeu_ps(circle_circle_collisions.n_x + num_circle_circle_collisions, packed_n_x);
+
+                    __m256 packed_n_y = _mm256_permutevar8x32_ps(n_y, shufmask);
+                    _mm256_storeu_ps(circle_circle_collisions.n_y + num_circle_circle_collisions, packed_n_y);
+
+                    __m256 packed_p_x = _mm256_permutevar8x32_ps(p_x, shufmask);
+                    _mm256_storeu_ps(circle_circle_collisions.p_x + num_circle_circle_collisions, packed_p_x);
+
+                    __m256 packed_p_y = _mm256_permutevar8x32_ps(p_y, shufmask);
+                    _mm256_storeu_ps(circle_circle_collisions.p_y + num_circle_circle_collisions, packed_p_y);
+
+                    __m256i packed_a_index = _mm256_permutevar8x32_epi32(a_index, shufmask);
+                    _mm256_storeu_epi32(circle_circle_collisions.a_index + num_circle_circle_collisions, packed_a_index);
+                    
+                    __m256i packed_b_index = _mm256_permutevar8x32_epi32(b_index, shufmask);
+                    _mm256_storeu_epi32(circle_circle_collisions.b_index + num_circle_circle_collisions, packed_b_index);
+
+                    int num_valid = _mm_popcnt_u64(collision_mask32);
+                    num_circle_circle_collisions += num_valid;
+
+                    b_index = _mm256_add_epi32(b_index, _mm256_set1_epi32(1));
                 }
+
+                a_index = _mm256_add_epi32(a_index, _mm256_set1_epi32(8));
             }
 #endif
 
@@ -1019,6 +1069,7 @@ namespace Sandbox
             }
 
 
+#if 0
             for(int collision_index = 0; collision_index < collisions.size(); collision_index++)
             {
                 SoaCollision &collision = collisions[collision_index];
@@ -1115,6 +1166,208 @@ namespace Sandbox
                     *b_av += (*b_inv_moment_of_inertia * cross(rb, friction_impulse));
                 }
             }
+#else
+            for(int collision_index = 0; collision_index < num_box_circle_collisions; collision_index++)
+            {
+                uint32_t a_index = box_circle_collisions.a_index[collision_index];
+                uint32_t b_index = box_circle_collisions.b_index[collision_index];
+                float pen = box_circle_collisions.pen[collision_index];
+                float n_x = box_circle_collisions.n_x[collision_index];
+                float n_y = box_circle_collisions.n_y[collision_index];
+                float p_x = box_circle_collisions.p_x[collision_index];
+                float p_y = box_circle_collisions.p_y[collision_index];
+                bool body_containing_reference_edge = box_circle_collisions.body_containing_reference_edge[collision_index];
+
+                float *a_vx = soa_box_list.vx + a_index;
+                float *a_vy = soa_box_list.vy + a_index;
+                float *a_av = soa_box_list.av + a_index;
+                float *a_inv_mass = soa_box_list.inv_mass + a_index;
+                float *a_inv_moment_of_inertia = soa_box_list.inv_moment_of_inertia + a_index;
+                float *a_px = soa_box_list.px + a_index;
+                float *a_py = soa_box_list.py + a_index;
+
+                float *b_vx = soa_circle_list.vx + b_index;
+                float *b_vy = soa_circle_list.vy + b_index;
+                float *b_av = soa_circle_list.av + b_index;
+                float *b_inv_mass = soa_circle_list.inv_mass + b_index;
+                float *b_inv_moment_of_inertia = soa_circle_list.inv_moment_of_inertia + b_index;
+                float *b_px = soa_circle_list.px + b_index;
+                float *b_py = soa_circle_list.py + b_index;
+
+                if(body_containing_reference_edge)
+                {
+                    std::swap(a_vx, b_vx);
+                    std::swap(a_vy, b_vy);
+                    std::swap(a_av, b_av);
+                    std::swap(a_inv_mass, b_inv_mass);
+                    std::swap(a_inv_moment_of_inertia, b_inv_moment_of_inertia);
+                    std::swap(a_px, b_px);
+                    std::swap(a_py, b_py);
+                }
+
+                assert(!(n_x == 0.0f && n_y == 0.0f));
+
+                v2 n = v2(n_x, n_y);
+                v2 contact_position = v2(p_x, p_y);
+
+                v2 ra = contact_position - v2(*a_px, *a_py);
+                v2 rb = contact_position - v2(*b_px, *b_py);
+                v2 relative_velocity = -(v2(*a_vx, *a_vy) + cross(*a_av, ra)) + (v2(*b_vx, *b_vy) + cross(*b_av, rb));
+
+                float vn = dot(n, relative_velocity);
+
+                static const float beta_coeff = -0.4f;
+                static const float minimum_pen = 0.01f;
+
+                float beta = (beta_coeff / sub_time_step) * min(0.0f, -pen + minimum_pen);
+
+                float rna = dot(ra, n);
+                float rnb = dot(rb, n);
+                float k_normal = *a_inv_mass + *b_inv_mass;
+                k_normal += *a_inv_moment_of_inertia * (dot(ra, ra) - rna * rna) + *b_inv_moment_of_inertia * (dot(rb, rb) - rnb * rnb);
+                float effective_mass = 1.0f / k_normal;
+
+                float lambda = effective_mass * (-vn + beta);
+                lambda = max(lambda, 0.0f);
+                v2 impulse = lambda * n;
+
+                *a_vx += -(*a_inv_mass * impulse).x;
+                *a_vy += -(*a_inv_mass * impulse).y;
+                *a_av += -(*a_inv_moment_of_inertia * cross(ra, impulse));
+
+                *b_vx += (*b_inv_mass * impulse).x;
+                *b_vy += (*b_inv_mass * impulse).y;
+                *b_av += (*b_inv_moment_of_inertia * cross(rb, impulse));
+
+                // Friction
+                v2 tangent = v2(n.y, -n.x);
+                relative_velocity = -(v2(*a_vx, *a_vy) + cross(*a_av, ra)) + (v2(*b_vx, *b_vy) + cross(*b_av, rb));
+
+                float vt = dot(tangent, relative_velocity);
+
+                float rta = dot(ra, tangent);
+                float rtb = dot(rb, tangent);
+                float k_tangent = *a_inv_mass + *b_inv_mass;
+                k_tangent += *a_inv_moment_of_inertia * (dot(ra, ra) - rta * rta) + *b_inv_moment_of_inertia * (dot(rb, rb) - rtb * rtb);
+                float mass_tangent = 1.0f / k_tangent;
+                float dpt = mass_tangent * -vt;
+
+                const static float friction = 0.1f;
+                float maxPt = friction * lambda;
+                dpt = clamp(dpt, -maxPt, maxPt);
+                v2 friction_impulse = dpt * tangent;
+
+                *a_vx += -(*a_inv_mass * friction_impulse).x;
+                *a_vy += -(*a_inv_mass * friction_impulse).y;
+                *a_av += -(*a_inv_moment_of_inertia * cross(ra, friction_impulse));
+
+                *b_vx += (*b_inv_mass * friction_impulse).x;
+                *b_vy += (*b_inv_mass * friction_impulse).y;
+                *b_av += (*b_inv_moment_of_inertia * cross(rb, friction_impulse));
+            }
+
+            for(int collision_index = 0; collision_index < num_circle_circle_collisions; collision_index++)
+            {
+                uint32_t a_index = circle_circle_collisions.a_index[collision_index];
+                uint32_t b_index = circle_circle_collisions.b_index[collision_index];
+                float pen = circle_circle_collisions.pen[collision_index];
+                float n_x = circle_circle_collisions.n_x[collision_index];
+                float n_y = circle_circle_collisions.n_y[collision_index];
+                float p_x = circle_circle_collisions.p_x[collision_index];
+                float p_y = circle_circle_collisions.p_y[collision_index];
+                bool body_containing_reference_edge = circle_circle_collisions.body_containing_reference_edge[collision_index];
+
+                float *a_vx = soa_circle_list.vx + a_index;
+                float *a_vy = soa_circle_list.vy + a_index;
+                float *a_av = soa_circle_list.av + a_index;
+                float *a_inv_mass = soa_circle_list.inv_mass + a_index;
+                float *a_inv_moment_of_inertia = soa_circle_list.inv_moment_of_inertia + a_index;
+                float *a_px = soa_circle_list.px + a_index;
+                float *a_py = soa_circle_list.py + a_index;
+
+                float *b_vx = soa_circle_list.vx + b_index;
+                float *b_vy = soa_circle_list.vy + b_index;
+                float *b_av = soa_circle_list.av + b_index;
+                float *b_inv_mass = soa_circle_list.inv_mass + b_index;
+                float *b_inv_moment_of_inertia = soa_circle_list.inv_moment_of_inertia + b_index;
+                float *b_px = soa_circle_list.px + b_index;
+                float *b_py = soa_circle_list.py + b_index;
+
+                if(body_containing_reference_edge)
+                {
+                    std::swap(a_vx, b_vx);
+                    std::swap(a_vy, b_vy);
+                    std::swap(a_av, b_av);
+                    std::swap(a_inv_mass, b_inv_mass);
+                    std::swap(a_inv_moment_of_inertia, b_inv_moment_of_inertia);
+                    std::swap(a_px, b_px);
+                    std::swap(a_py, b_py);
+                }
+
+                assert(!(n_x == 0.0f && n_y == 0.0f));
+
+                v2 n = v2(n_x, n_y);
+                v2 contact_position = v2(p_x, p_y);
+
+                v2 ra = contact_position - v2(*a_px, *a_py);
+                v2 rb = contact_position - v2(*b_px, *b_py);
+                v2 relative_velocity = -(v2(*a_vx, *a_vy) + cross(*a_av, ra)) + (v2(*b_vx, *b_vy) + cross(*b_av, rb));
+
+                float vn = dot(n, relative_velocity);
+
+                static const float beta_coeff = -0.4f;
+                static const float minimum_pen = 0.01f;
+
+                float beta = (beta_coeff / sub_time_step) * min(0.0f, -pen + minimum_pen);
+
+                float rna = dot(ra, n);
+                float rnb = dot(rb, n);
+                float k_normal = *a_inv_mass + *b_inv_mass;
+                k_normal += *a_inv_moment_of_inertia * (dot(ra, ra) - rna * rna) + *b_inv_moment_of_inertia * (dot(rb, rb) - rnb * rnb);
+                float effective_mass = 1.0f / k_normal;
+
+                float lambda = effective_mass * (-vn + beta);
+                lambda = max(lambda, 0.0f);
+                v2 impulse = lambda * n;
+
+                *a_vx += -(*a_inv_mass * impulse).x;
+                *a_vy += -(*a_inv_mass * impulse).y;
+                *a_av += -(*a_inv_moment_of_inertia * cross(ra, impulse));
+
+                *b_vx += (*b_inv_mass * impulse).x;
+                *b_vy += (*b_inv_mass * impulse).y;
+                *b_av += (*b_inv_moment_of_inertia * cross(rb, impulse));
+
+                // Friction
+                v2 tangent = v2(n.y, -n.x);
+                relative_velocity = -(v2(*a_vx, *a_vy) + cross(*a_av, ra)) + (v2(*b_vx, *b_vy) + cross(*b_av, rb));
+
+                float vt = dot(tangent, relative_velocity);
+
+                float rta = dot(ra, tangent);
+                float rtb = dot(rb, tangent);
+                float k_tangent = *a_inv_mass + *b_inv_mass;
+                k_tangent += *a_inv_moment_of_inertia * (dot(ra, ra) - rta * rta) + *b_inv_moment_of_inertia * (dot(rb, rb) - rtb * rtb);
+                float mass_tangent = 1.0f / k_tangent;
+                float dpt = mass_tangent * -vt;
+
+                const static float friction = 0.1f;
+                float maxPt = friction * lambda;
+                dpt = clamp(dpt, -maxPt, maxPt);
+                v2 friction_impulse = dpt * tangent;
+
+                *a_vx += -(*a_inv_mass * friction_impulse).x;
+                *a_vy += -(*a_inv_mass * friction_impulse).y;
+                *a_av += -(*a_inv_moment_of_inertia * cross(ra, friction_impulse));
+
+                *b_vx += (*b_inv_mass * friction_impulse).x;
+                *b_vy += (*b_inv_mass * friction_impulse).y;
+                *b_av += (*b_inv_moment_of_inertia * cross(rb, friction_impulse));
+            }
+#endif
+
+            num_box_circle_collisions = 0;
+            num_circle_circle_collisions = 0;
         }
 
 
