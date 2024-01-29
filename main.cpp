@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <cstdio>
 #include <cassert>
+#include <cmath>
 
 #include "glad/glad.h"
 #include <gl/glu.h>
@@ -32,11 +33,6 @@ typedef int64_t  s64;
 
 #define ARRAY_COUNT(N) (sizeof(N) / sizeof(*(N)))
 #define SQ(N) ((N)*(N))
-
-
-
-
-
 
 
 #define MAX_QUADS 1024 * 1024
@@ -106,6 +102,45 @@ float g_color_data[NUM_COLOR_ID * 3] = {
 
 
 
+struct v2
+{
+    float x, y;
+
+    v2 operator+(const v2 v) const { return v2{x + v.x, y + v.y}; }
+    v2 operator-(const v2 v) const { return v2{x - v.x, y - v.y}; }
+    v2 operator*(float v) const { return v2{x*v, y*v}; }
+    v2 operator/(float v) const { return v2{x/v, y/v}; }
+    v2 operator-() const { return v2{-x, -y}; }
+    v2 operator+=(v2 v)
+    {
+        x += v.x;
+        y += v.y;
+        return *this;
+    }
+};
+v2 operator*(float a, v2 b) { return v2{a*b.x, a*b.y}; }
+float dot(v2 a, v2 b)
+{
+    return a.x*b.x + a.y*b.y;
+}
+float len_sq(v2 v)
+{
+    return dot(v, v);
+}
+float len(v2 v)
+{
+    return sqrtf(len_sq(v));
+}
+v2 normalize(v2 v)
+{
+    return v / len(v);
+}
+v2 normalize_safe(v2 v)
+{
+    const float l = len(v);
+    return l == 0.0f ? v2{0.0f, 0.0f} : v / len(v);
+}
+
 
 
 u32 g_screen_width;
@@ -113,9 +148,18 @@ u32 g_screen_height;
 FILE* g_log_file;
 LARGE_INTEGER g_freq;
 
-static u32 min_u32(u32 a, u32 b)
+static inline u32 min_u32(u32 a, u32 b)
 {
     return a < b ? a : b;
+}
+
+static inline float min_f32(float a, float b)
+{
+    return a < b ? a : b;
+}
+static inline float max_f32(float a, float b)
+{
+    return a > b ? a : b;
 }
 
 #define GL_ERR() check_gl_errors_fn(__FILE__, __LINE__);
@@ -218,6 +262,16 @@ static void quad(
     graphics_data->num_quads++;
 }
 
+static inline void quad(
+                 GraphicsData* graphics_data,
+                 const v2 pos,
+                 const float w,
+                 const float h,
+                 const enum ColorId color_id)
+{
+    quad(graphics_data, pos.x, pos.y, w, h, color_id);
+}
+
 static void circle(
                    GraphicsData* graphics_data,
                    const float x,
@@ -233,6 +287,14 @@ static void circle(
     graphics_data->circle_g[num] = g_color_data[color_id*3 + 1];
     graphics_data->circle_b[num] = g_color_data[color_id*3 + 2];
     graphics_data->num_circles++;
+}
+static void circle(
+                   GraphicsData* graphics_data,
+                   const v2 pos,
+                   const float r,
+                   const enum ColorId color_id)
+{
+    circle(graphics_data, pos.x, pos.y, r, color_id);
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -454,7 +516,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                                                         "void main()"
                                                         "{"
                                                         "    vec2 delta = vec2(frag_u, frag_v);"
-                                                        "    if(dot(delta, delta) > 0.707f*0.5f * 0.707f*0.5f)"
+                                                        "    if(dot(delta, delta) > 0.707f* 0.707f*0.5f)"
                                                         "    {"
                                                         "        discard;"
                                                         "    }"
@@ -464,16 +526,28 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
     
     
-    
-    u32 num_circles = 2;
-    float circle_px_m[] = {-5.0f, 5.0f};
-    float circle_py_m[] = {0.0f, 0.0f};
-    float radius_m[] = {0.5f, 0.5f};
-    
-    float circle_vx_mps[] = {1.0f, -1.0f};
-    float circle_vy_mps[] = {0.0f, 0.0f};
-    
-    float circle_mass_kg[] = {1.0f, 1.0f};
+    u32 num_circles = 3;
+    v2 circle_pos_m[] = {
+        {-5.0f, 0.25f},
+        {5.0f, -0.25f},
+        {0.0f, 5.0f}
+    };
+    float circle_radius_m[] = {
+        0.5f,
+        0.5f,
+        0.5f
+    };
+    const float VEL_MAG = 8.0f;
+    v2 circle_vel_mps[] = {
+        {VEL_MAG, 0.0f},
+        {-VEL_MAG, 0.0f},
+        {0.0f, -VEL_MAG}
+    };
+    float circle_inv_mass_kg[] = {
+        1.0f,
+        1.0f,
+        1.0f,
+    };
     
     const s64 frame_time_ms = 16LL;
     const s64 engine_start_ms = get_time_ms();
@@ -525,39 +599,152 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         float camera_pos_x = 0.0f;
         float camera_pos_y = 0.0f;
         
-        //const float gravity_mps2 = -9.8f;
-        const float gravity_mps2 = 0.0f;
+        static float gravity_mps2 = -9.8f;
+        //static float gravity_mps2 = 0.0f;
+        ImGui::DragFloat("gravity mps2", &gravity_mps2, 0.01f);
+        static float friction_coeff = 2.0f;
+        ImGui::DragFloat("friction_coeff", &friction_coeff, 0.01f);
         
         
-        float ax_mps2[] = {0.0f, 0.0f};
-        float ay_mps2[] = {gravity_mps2, gravity_mps2};
+        v2 accel_mps2[] = {
+            {0.0f, gravity_mps2},
+            {0.0f, gravity_mps2},
+            {0.0f, gravity_mps2}
+        };
+
+        ColorId color = BLUE;
         
-        for(u32 i = 0; i < num_circles; i++)
+        // 1. Compute forces
+        // Friction
+        for(u64 i = 0; i < num_circles; i++)
         {
-            const float px_m = circle_px_m[i];
-            const float py_m = circle_py_m[i];
-            const float vx_mps = circle_vx_mps[i];
-            const float vy_mps = circle_vy_mps[i];
-            
-            const float result_vx_mps = vx_mps + ax_mps2[i] * dt_s;
-            const float result_vy_mps = vy_mps + ay_mps2[i] * dt_s;
-            
-            const float result_px_m = px_m + vx_mps * dt_s + 0.5f * ax_mps2[i] * SQ(dt_s);
-            const float result_py_m = py_m + vy_mps * dt_s + 0.5f * ay_mps2[i] * SQ(dt_s);
-            
-            circle_vx_mps[i] = result_vx_mps;
-            circle_vy_mps[i] = result_vy_mps;
-            circle_px_m[i] = result_px_m;
-            circle_py_m[i] = result_py_m;
+            accel_mps2[i] += -normalize_safe(circle_vel_mps[i]) * friction_coeff;
         }
-        
+        // 2. Integrate forces into velocity.
+        for(u64 i = 0; i < num_circles; i++)
+        {
+            const v2 vel_mps = circle_vel_mps[i];
+            const v2 result_vel_mps = vel_mps + accel_mps2[i] * dt_s;
+            circle_vel_mps[i] = result_vel_mps;
+        }
+
+        // 2. Collision impulses
+        static float e = 0.8f;
+        ImGui::DragFloat("e", &e, 0.001f);
+        for(u64 iter = 0; iter < 8; iter++)
+        {
+            for(u64 ai = 0; ai < num_circles; ai++)
+            {
+                const v2 a_pos_m = circle_pos_m[ai];
+                const v2 a_vel_mps = circle_vel_mps[ai];
+                const float a_radius_m = circle_radius_m[ai];
+                const float a_inv_mass_kg = circle_inv_mass_kg[ai];
+
+                // Other circles
+                for(u64 bi = ai + 1; bi < num_circles; bi++)
+                {
+                    const v2 b_pos_m = circle_pos_m[bi];
+                    const v2 b_vel_mps = circle_vel_mps[bi];
+                    const float b_radius_m = circle_radius_m[bi];
+                    const float b_inv_mass_kg = circle_inv_mass_kg[bi];
+
+                    if(len_sq(a_pos_m - b_pos_m) < SQ(a_radius_m + b_radius_m))
+                    {
+                        v2 n = a_pos_m - b_pos_m;
+                        const v2 relv_mps = a_vel_mps - b_vel_mps;
+
+                        if(dot(relv_mps, n) < 0)
+                        {
+                            float j = dot(-(1.0f + e) * relv_mps, n) /
+                                (dot(n, n) * (a_inv_mass_kg + b_inv_mass_kg));
+
+
+                            const v2 a_result_vel_mps = a_vel_mps + j * a_inv_mass_kg * n;
+                            const v2 b_result_vel_mps = b_vel_mps - j * b_inv_mass_kg * n;
+                            circle_vel_mps[ai] = a_result_vel_mps;
+                            circle_vel_mps[bi] = b_result_vel_mps;
+
+                            color = RED;
+                        }
+                    }
+                }
+
+                // Walls
+                if(a_pos_m.y < -5.0f)
+                {
+                    const v2 n = {0.0f, 1.0f};
+                    const v2 relv_mps = a_vel_mps;
+                    if(dot(relv_mps, n) < 0)
+                    {
+                        float j = dot(-(1.0f + e) * relv_mps, n) /
+                                  (dot(n, n) * (a_inv_mass_kg));
+                        const v2 a_result_vel_mps = a_vel_mps + j * a_inv_mass_kg * n;
+                        circle_vel_mps[ai] = a_result_vel_mps;
+                    }
+                }
+                if(a_pos_m.y > 5.0f)
+                {
+                    const v2 n = {0.0f, -1.0f};
+                    const v2 relv_mps = a_vel_mps;
+                    if(dot(relv_mps, n) < 0)
+                    {
+                        float j = dot(-(1.0f + e) * relv_mps, n) /
+                                  (dot(n, n) * (a_inv_mass_kg));
+                        const v2 a_result_vel_mps = a_vel_mps + j * a_inv_mass_kg * n;
+                        circle_vel_mps[ai] = a_result_vel_mps;
+                    }
+                }
+                if(a_pos_m.x < -5.0f)
+                {
+                    const v2 n = {1.0f, 0.0f};
+                    const v2 relv_mps = a_vel_mps;
+                    if(dot(relv_mps, n) < 0)
+                    {
+                        float j = dot(-(1.0f + e) * relv_mps, n) /
+                                  (dot(n, n) * (a_inv_mass_kg));
+                        const v2 a_result_vel_mps = a_vel_mps + j * a_inv_mass_kg * n;
+                        circle_vel_mps[ai] = a_result_vel_mps;
+                    }
+                }
+                if(a_pos_m.x > 5.0f)
+                {
+                    const v2 n = {-1.0f, 0.0f};
+                    const v2 relv_mps = a_vel_mps;
+                    if(dot(relv_mps, n) < 0)
+                    {
+                        float j = dot(-(1.0f + e) * relv_mps, n) /
+                                  (dot(n, n) * (a_inv_mass_kg));
+                        const v2 a_result_vel_mps = a_vel_mps + j * a_inv_mass_kg * n;
+                        circle_vel_mps[ai] = a_result_vel_mps;
+                    }
+                }
+            }
+        }
+
+        // 3. Integrate velocity into position.
+        for(u64 i = 0; i < num_circles; i++)
+        {
+            const v2 pos_m = circle_pos_m[i];
+            const v2 vel_mps = circle_vel_mps[i];
+            const v2 result_pos_m = pos_m + vel_mps * dt_s + 0.5f * accel_mps2[i] * SQ(dt_s);
+            circle_pos_m[i] = result_pos_m;
+        }
+
+        // Metrics
+        v2 total_momentum = {};
+        for(u64 i = 0; i < num_circles; i++)
+        {
+            total_momentum += circle_vel_mps[i] * (1.0f / circle_inv_mass_kg[i]);
+            ImGui::Text("    vel %i: (%.3f, %.3f) : |%.3f|", i, circle_vel_mps[i].x, circle_vel_mps[i].y, len(circle_vel_mps[i]));
+        }
+        ImGui::Text("Total momentum: (%.3f, %.3f) : |%.3f|", total_momentum.x, total_momentum.y, len(total_momentum));
         
         graphics_data->num_quads = 0;
         graphics_data->num_circles = 0;
         
-        for(u32 i = 0; i < num_circles; i++)
+        for(u64 i = 0; i < num_circles; i++)
         {
-            circle(graphics_data, circle_px_m[i], circle_py_m[i], radius_m[i], BLUE);
+            circle(graphics_data, circle_pos_m[i], circle_radius_m[i], color);
         }
         
         ImGui::Text("Time: %.3f s", double(engine_time_ms) / 1000.0);
